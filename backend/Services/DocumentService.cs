@@ -83,6 +83,29 @@ public class DocumentService : IDocumentService
         return (document.ContenuFichier, document.NomFichier);
     }
 
+    public async Task<DocumentDto?> UpdateDateExpirationAsync(int documentId, DateTime? dateExpiration)
+    {
+        var document = await _context.Documents.FirstOrDefaultAsync(d => d.Id == documentId);
+        if (document == null)
+            return null;
+
+        document.DateExpiration = dateExpiration;
+        await _context.SaveChangesAsync();
+
+        return MapToDto(document);
+    }
+
+    public async Task<bool> DeleteDocumentAsync(int documentId)
+    {
+        var document = await _context.Documents.FirstOrDefaultAsync(d => d.Id == documentId);
+        if (document == null)
+            return false;
+
+        _context.Documents.Remove(document);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
     public static DocumentDto MapToDto(Document document)
     {
         return new DocumentDto

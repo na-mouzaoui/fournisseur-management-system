@@ -16,12 +16,14 @@ public interface IOperateurService
     Task<OperateurEconomiqueDto> CreateOperateurAsync(CreateOperateurRequest request, int createdBy);
     Task<OperateurEconomiqueDto> UpdateOperateurAsync(int id, UpdateOperateurRequest request);
     Task<bool> DeleteOperateurAsync(int id);
+    Task<OperateurEconomiqueDto> ArchiveOperateurAsync(int id, bool isArchived);
 }
 
 public interface IDossierService
 {
     Task<DossierPagedResult> GetAllDossiersAsync(int page, int pageSize, int? statutId);
     Task<DossierDto?> GetDossierByIdAsync(int id);
+    Task<DossierDto> GetOrCreateForOperateurAsync(int operateurId);
     Task<DossierDto> CreateDossierAsync(CreateDossierRequest request);
     Task<DossierDto?> UpdateDossierAsync(int id, UpdateDossierRequest request);
     Task<bool> DeleteDossierAsync(int id);
@@ -32,6 +34,8 @@ public interface IDocumentService
     Task<DocumentDto> UploadDocumentAsync(CreateDocumentRequest request, byte[] contenu, int uploaderId);
     Task<DocumentDto> UploadDocumentReplacementAsync(int dossierId, string typeCode, byte[] contenu, string nomFichier, DateTime? dateExpiration, int uploaderId);
     Task<(byte[] Contenu, string NomFichier)?> DownloadDocumentAsync(int documentId);
+    Task<DocumentDto?> UpdateDateExpirationAsync(int documentId, DateTime? dateExpiration);
+    Task<bool> DeleteDocumentAsync(int documentId);
 }
 
 public interface INotificationService

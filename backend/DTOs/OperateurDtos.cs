@@ -23,6 +23,13 @@ public class OperateurEconomiqueDto
     public int? CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public bool IsArchived { get; set; }
+    public DateTime? DateSuppression { get; set; }
+}
+
+public class ArchiveOperateurRequest
+{
+    public bool IsArchived { get; set; }
 }
 
 public class CreateOperateurRequest

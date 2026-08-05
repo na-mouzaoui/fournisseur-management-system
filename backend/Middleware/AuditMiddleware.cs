@@ -39,7 +39,7 @@ public class AuditMiddleware
             return; // Échec : on ne journalise pas l'action.
 
         var (action, entite, entiteId) = Resolve(method, path);
-        if (action == null)
+        if (action == null || entite == null)
             return; // Route non gérée (ex. login/logout).
 
         var userId = GetUserId(context);

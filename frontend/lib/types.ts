@@ -1,6 +1,6 @@
 // ===== Authentification =====
 export interface LoginRequest {
-  identifiant: string
+  email: string
   password: string
 }
 
@@ -71,6 +71,8 @@ export interface OperateurEconomique {
   createdBy?: number
   createdAt: string
   updatedAt?: string
+  isArchived?: boolean
+  dateSuppression?: string
 }
 
 export interface CreateOperateurRequest {
@@ -193,11 +195,6 @@ export interface PaginatedResponse<T> {
 }
 
 // ===== Dashboard =====
-export interface EvolutionMensuelle {
-  mois: string // format: 'YYYY-MM'
-  nouveaux: number
-}
-
 export interface SecteurRepartition {
   secteur: string
   nombre: number
@@ -215,7 +212,8 @@ export interface DashboardStats {
   totalOperateurs: number
   operateursBlacklistes: number
   nouveaux30Jours: number
-  evolutionMensuelle: EvolutionMensuelle[]
+  nouveauxMoisEnCours: number
+  supprimesMoisEnCours: number
   repartitionSecteurs: SecteurRepartition[]
   derniersFournisseurs: DernierFournisseur[]
 }

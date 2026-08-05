@@ -63,6 +63,10 @@ public class OperateurController : ControllerBase
         {
             return NotFound();
         }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpDelete("{id}")]
@@ -73,5 +77,19 @@ public class OperateurController : ControllerBase
             return NotFound();
 
         return NoContent();
+    }
+
+    [HttpPost("{id}/archive")]
+    public async Task<ActionResult<OperateurEconomiqueDto>> Archive(int id, [FromBody] ArchiveOperateurRequest request)
+    {
+        try
+        {
+            var operateur = await _operateurService.ArchiveOperateurAsync(id, request.IsArchived);
+            return Ok(operateur);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
     }
 }

@@ -1,22 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useAuth } from '@/lib/auth-context'
+import React, { Suspense, useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Eye, EyeOff, User as UserIcon } from 'lucide-react'
+import { CheckCircle2, Eye, EyeOff } from 'lucide-react'
 
-export default function LoginPage() {
-  const [identifiant, setIdentifiant] = useState('')
+function LoginFormContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const registered = searchParams.get('registered')
+  const { login, user, isAuthenticated } = useAuth()
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const { login, user, isAuthenticated } = useAuth()
-  const router = useRouter()
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -27,16 +30,15 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    setIsLoading(true)
-
+    setLoading(true)
     try {
-      await login(identifiant, password)
+      await login(email, password)
       router.push(user?.role === 'admin' ? '/admin' : '/dashboard')
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Identifiants incorrects'
+      const errorMessage = err instanceof Error ? err.message : 'Email ou mot de passe incorrect'
       setError(errorMessage)
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
@@ -52,26 +54,31 @@ export default function LoginPage() {
             <CardDescription>Entrez vos identifiants pour accéder à votre compte</CardDescription>
           </CardHeader>
           <CardContent>
+            {registered && (
+              <div
+                className="mb-4 flex items-center gap-2 rounded-md border p-4"
+                style={{ borderColor: '#2db34b', backgroundColor: '#f0fdf4' }}
+              >
+                <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: '#2db34b' }} />
+                <p className="text-sm" style={{ color: '#2db34b' }}>
+                  Votre compte a été créé avec succès ! Vous pouvez maintenant vous connecter.
+                </p>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <p className="text-sm text-red-600 font-medium">{error}</p>
-              )}
+              {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
 
               <div className="space-y-2">
-                <Label htmlFor="identifiant">Identifiant</Label>
-                <div className="relative">
-                  <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="identifiant"
-                    type="text"
-                    placeholder="votre.identifiant"
-                    value={identifiant}
-                    onChange={(e) => setIdentifiant(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    className="pl-9"
-                  />
-                </div>
+                <Label htmlFor="email">Adresse email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="prenom.nom@mobilis.dz"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={loading}
+                />
               </div>
 
               <div className="space-y-2">
@@ -84,13 +91,13 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    disabled={isLoading}
+                    disabled={loading}
                     className="pr-10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    disabled={isLoading}
+                    disabled={loading}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                     title={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                   >
@@ -99,19 +106,27 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Connexion...' : 'Se connecter'}
+              <Button type="submit" className="w-full" disabled={loading} style={{ backgroundColor: '#2db34b' }}>
+                {loading ? 'Connexion...' : 'Se connecter'}
               </Button>
 
               <div className="text-xs text-gray-600 mt-4 p-3 bg-gray-50 rounded-md border border-gray-200">
                 <p className="font-bold mb-2">Comptes de test:</p>
-                <p>Admin: nazim.mouzaoui / N@zim2002</p>
-                <p>Agent: manager / Manager@123</p>
+                <p>Admin: nazim.mouzaoui@gmail.dz / N@zim2002</p>
+                <p>Agent: manager@example.com / Manager@123</p>
               </div>
             </form>
           </CardContent>
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginFormContent />
+    </Suspense>
   )
 }

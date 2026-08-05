@@ -54,3 +54,8 @@ public class CreateDocumentRequest
     public string NomFichier { get; set; } = string.Empty;
     public DateTime? DateExpiration { get; set; }
 }
+
+public class UpdateDocumentDateExpirationRequest
+{
+    public DateTime? DateExpiration { get; set; }
+}

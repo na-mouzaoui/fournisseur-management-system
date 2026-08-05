@@ -7,23 +7,14 @@ import { Package, AlertTriangle, TrendingUp, PieChart } from 'lucide-react'
 import { DashboardStats } from '@/lib/types'
 import { apiClient } from '@/lib/api-client'
 
-const MOIS_FR = [
-  'Janv', 'Févr', 'Mars', 'Avr', 'Mai', 'Juin',
-  'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc',
-]
-
-function formatMois(mois: string): string {
-  const [annee, num] = mois.split('-')
-  const index = Number(num) - 1
-  return index >= 0 && index < 12 ? `${MOIS_FR[index]} ${annee}` : mois
-}
-
 function StatutBadge({ statut }: { statut?: string }) {
   const classes =
-    statut === 'validé'
+    statut === 'actif' || statut === 'validé'
       ? 'bg-[#2db34b] text-white'
-      : statut === 'rejeté' || statut === 'suspendu'
+      : statut === 'rejeté' || statut === 'blacklisté'
       ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
+      : statut === 'suspendu'
+      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100'
       : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
   return (
     <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${classes}`}>
@@ -67,7 +58,8 @@ export default function DashboardPage() {
 
   const selectedSectorCount =
     stats.repartitionSecteurs.find((d) => d.secteur === selectedSector)?.nombre ?? 0
-  const maxMensuel = Math.max(1, ...stats.evolutionMensuelle.map((d) => d.nouveaux))
+
+  const evolution = stats.nouveauxMoisEnCours - stats.supprimesMoisEnCours
 
   return (
     <div className="space-y-6">
@@ -155,42 +147,29 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Évolution mensuelle */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Évolution du nombre de fournisseurs</CardTitle>
-          <CardDescription>
-            Nouveaux fournisseurs enregistrés au cours des 12 derniers mois
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-end gap-2 h-48">
-            {stats.evolutionMensuelle.map((d) => (
-              <div
-                key={d.mois}
-                className="flex-1 flex flex-col items-center gap-1 h-full justify-end"
-                title={`${formatMois(d.mois)} : ${d.nouveaux} nouveau(x)`}
-              >
-                <span className="text-xs font-semibold text-gray-600">
-                  {d.nouveaux}
-                </span>
-                <div
-                  className="w-full rounded-t-md"
-                  style={{
-                    height: `${Math.round((d.nouveaux / maxMensuel) * 100)}%`,
-                    backgroundColor: d.nouveaux > 0 ? '#2db34b' : '#e5e5e5',
-                  }}
-                />
-                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                  {MOIS_FR[Number(d.mois.split('-')[1]) - 1]}
-                </span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
+            <CardTitle className="text-sm font-semibold">
+              Évolution du nombre de fournisseurs
+            </CardTitle>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2db34b]/10">
+              <TrendingUp className="h-4 w-4" style={{ color: '#2db34b' }} />
+            </div>
+          </CardHeader>
+          <CardContent className="pt-1 pb-3">
+            <div
+              className="text-4xl font-bold leading-none"
+              style={{ color: evolution >= 0 ? '#2db34b' : '#e82c2a' }}
+            >
+              {evolution}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Créés : {stats.nouveauxMoisEnCours} — Supprimés : {stats.supprimesMoisEnCours}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Derniers fournisseurs */}
       <Card>

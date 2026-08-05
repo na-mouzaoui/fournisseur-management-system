@@ -24,6 +24,8 @@ public class OperateurEconomique
     public Utilisateur? Createur { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
+    public bool IsArchived { get; set; }
+    public DateTime? DateSuppression { get; set; }
 
     public List<Dossier> Dossiers { get; set; } = new();
 }

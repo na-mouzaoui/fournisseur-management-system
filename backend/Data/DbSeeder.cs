@@ -6,6 +6,19 @@ public static class DbSeeder
 {
     public static void Seed(ApplicationDbContext context)
     {
+        // Ajouter les statuts manquants
+        var requiredStatuts = new[] { "actif", "blacklisté", "archivé", "en cours", "validé", "rejeté", "suspendu" };
+        var existingStatuts = context.Statuts.Select(s => s.Libelle).ToList();
+        var missingStatuts = requiredStatuts
+            .Where(s => !existingStatuts.Contains(s))
+            .Select(s => new Statut { Libelle = s })
+            .ToList();
+        if (missingStatuts.Any())
+        {
+            context.Statuts.AddRange(missingStatuts);
+            context.SaveChanges();
+        }
+
         if (context.Roles.Any())
             return;
 
@@ -21,15 +34,6 @@ public static class DbSeeder
             Description = "Agent chargé du traitement des dossiers"
         };
         context.Roles.AddRange(adminRole, agentRole);
-
-        // Referentiel des statuts de dossier
-        context.Statuts.AddRange(
-            new Statut { Libelle = "en cours" },
-            new Statut { Libelle = "validé" },
-            new Statut { Libelle = "rejeté" },
-            new Statut { Libelle = "suspendu" },
-            new Statut { Libelle = "archivé" }
-        );
 
         // Referentiel des secteurs d'activité
         context.SecteursActivite.AddRange(

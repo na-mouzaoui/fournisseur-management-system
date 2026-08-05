@@ -24,9 +24,9 @@ public class AuthService : IAuthService
     {
         var user = await _context.Utilisateurs
             .Include(u => u.Role)
-            .FirstOrDefaultAsync(u => u.Identifiant == request.Identifiant);
+            .FirstOrDefaultAsync(u => u.Email == request.Email || u.Identifiant == request.Email);
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.MotDePasseHash))
-            throw new UnauthorizedAccessException("Identifiant ou mot de passe incorrect");
+            throw new UnauthorizedAccessException("Email ou mot de passe incorrect");
 
         if (user.Statut != "actif")
             throw new UnauthorizedAccessException("L'utilisateur est inactif");

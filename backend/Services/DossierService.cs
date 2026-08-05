@@ -55,6 +55,39 @@ public class DossierService : IDossierService
         return dossier != null ? MapToDto(dossier) : null;
     }
 
+    public async Task<DossierDto> GetOrCreateForOperateurAsync(int operateurId)
+    {
+        var existing = await _context.Dossiers
+            .Include(d => d.Operateur)
+            .Include(d => d.Statut)
+            .Include(d => d.AgentAffecte)
+            .Include(d => d.Documents)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d => d.OperateurId == operateurId);
+
+        if (existing != null)
+            return MapToDto(existing);
+
+        var statut = await _context.Statuts
+            .FirstOrDefaultAsync(s => s.Libelle == "en cours")
+            ?? await _context.Statuts.FirstOrDefaultAsync();
+
+        if (statut == null)
+            throw new InvalidOperationException("Aucun statut de dossier disponible");
+
+        var dossier = new Dossier
+        {
+            OperateurId = operateurId,
+            StatutId = statut.Id,
+            DateCreation = DateTime.UtcNow
+        };
+
+        _context.Dossiers.Add(dossier);
+        await _context.SaveChangesAsync();
+
+        return await GetDossierByIdAsync(dossier.Id) ?? MapToDto(dossier);
+    }
+
     public async Task<DossierDto> CreateDossierAsync(CreateDossierRequest request)
     {
         var dossier = new Dossier

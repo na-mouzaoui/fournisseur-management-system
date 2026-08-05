@@ -112,6 +112,8 @@ public class ApplicationDbContext : DbContext
             e.Property(o => o.CreatedBy).HasColumnName("created_by");
             e.Property(o => o.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETDATE()");
             e.Property(o => o.UpdatedAt).HasColumnName("updated_at");
+            e.Property(o => o.IsArchived).HasColumnName("is_archived").HasDefaultValue(false);
+            e.Property(o => o.DateSuppression).HasColumnName("date_suppression");
 
             e.HasIndex(o => o.NumeroImmatriculation).IsUnique();
             e.HasIndex(o => o.Nif).IsUnique();
@@ -183,7 +185,7 @@ public class ApplicationDbContext : DbContext
             e.HasIndex(d => new { d.DossierId, d.TypeCode }).IsUnique();
             e.HasAlternateKey(d => d.RowGuid);
             e.ToTable(t => t.HasCheckConstraint("CK_document_type_code",
-                "type_code IN ('REGISTRE_COMMERCE', 'STATUTS_SOCIETE', 'ATTESTATION_NIF', 'ATTESTATION_NIS', 'CASIER_JUDICIAIRE', 'PIECE_IDENTITE')"));
+                "type_code IN ('REGISTRE_COMMERCE', 'STATUTS_SOCIETE', 'ATTESTATION_NIF', 'ATTESTATION_NIS', 'CASIER_JUDICIAIRE', 'PIECE_IDENTITE', 'EXTRAIT_ROLE')"));
 
             e.HasOne(d => d.Dossier)
                 .WithMany(d => d.Documents)

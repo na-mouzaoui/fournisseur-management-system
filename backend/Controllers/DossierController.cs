@@ -21,8 +21,14 @@ public class DossierController : ControllerBase
     public async Task<ActionResult<DossierPagedResult>> GetAll(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
-        [FromQuery] int? statutId = null)
+        [FromQuery] int? statutId = null,
+        [FromQuery] int? operateurId = null)
     {
+        if (operateurId.HasValue)
+        {
+            var dossier = await _dossierService.GetOrCreateForOperateurAsync(operateurId.Value);
+            return Ok(dossier);
+        }
         var result = await _dossierService.GetAllDossiersAsync(page, pageSize, statutId);
         return Ok(result);
     }

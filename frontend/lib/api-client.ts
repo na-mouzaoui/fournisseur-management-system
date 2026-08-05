@@ -35,6 +35,16 @@ class ApiClient {
     return localStorage.getItem('auth_token')
   }
 
+  // En cas de session expirée (401), on nettoie le jeton et on redirige vers la connexion.
+  private handleSessionExpired(): void {
+    if (typeof window === 'undefined') return
+    localStorage.removeItem('auth_token')
+    const isAlreadyOnLogin = window.location.pathname.startsWith('/auth/login')
+    if (!isAlreadyOnLogin) {
+      window.location.href = '/auth/login'
+    }
+  }
+
   private async fetch<T>(
     endpoint: string,
     options: RequestInit = {}
@@ -60,6 +70,10 @@ class ApiClient {
       headers,
     })
 
+    if (response.status === 401 && !endpoint.startsWith('/api/auth/login')) {
+      this.handleSessionExpired()
+    }
+
     if (!response.ok) {
       const error = await response.json().catch(() => ({}))
       throw new Error(error.message || `HTTP error! status: ${response.status}`)
@@ -73,10 +87,10 @@ class ApiClient {
   }
 
   // ===== Authentification =====
-  async login(identifiant: string, password: string): Promise<AuthResponse> {
+  async login(email: string, password: string): Promise<AuthResponse> {
     return this.fetch<AuthResponse>('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ identifiant, password } as LoginRequest),
+      body: JSON.stringify({ email, password } as LoginRequest),
     })
   }
 
@@ -136,6 +150,13 @@ class ApiClient {
     })
   }
 
+  async archiveOperateur(id: number, isArchived: boolean): Promise<OperateurEconomique> {
+    return this.fetch<OperateurEconomique>(`/api/operateurs/${id}/archive`, {
+      method: 'POST',
+      body: JSON.stringify({ isArchived }),
+    })
+  }
+
   // ===== Dossiers =====
   async getDossiers(
     page: number = 1,
@@ -175,6 +196,12 @@ class ApiClient {
   async deleteDossier(id: number): Promise<void> {
     await this.fetch<void>(`/api/dossiers/${id}`, {
       method: 'DELETE',
+    })
+  }
+
+  async getDossierByOperateur(operateurId: number): Promise<Dossier> {
+    return this.fetch<Dossier>(`/api/dossiers?operateurId=${operateurId}`, {
+      method: 'GET',
     })
   }
 
@@ -221,10 +248,53 @@ class ApiClient {
     const response = await fetch(`${this.baseUrl}/api/documents/${id}/download`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
+    if (response.status === 401) {
+      this.handleSessionExpired()
+    }
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
     return response.blob()
+  }
+
+  // ===== Documents par opérateur (dossier auto-créé) =====
+  async getOperateurDocuments(operateurId: number): Promise<Document[]> {
+    return this.fetch<Document[]>(`/api/documents/operateurs/${operateurId}`, {
+      method: 'GET',
+    })
+  }
+
+  async uploadOperateurDocument(
+    operateurId: number,
+    typeCode: string,
+    fichier: File,
+    dateExpiration?: string
+  ): Promise<Document> {
+    const formData = new FormData()
+    formData.append('fichier', fichier)
+    formData.append('typeCode', typeCode)
+    if (dateExpiration) formData.append('dateExpiration', dateExpiration)
+
+    return this.fetch<Document>(`/api/documents/operateurs/${operateurId}`, {
+      method: 'POST',
+      body: formData,
+    })
+  }
+
+  async updateDocumentDateExpiration(
+    id: number,
+    dateExpiration: string | null
+  ): Promise<Document> {
+    return this.fetch<Document>(`/api/documents/${id}/date-expiration`, {
+      method: 'PATCH',
+      body: JSON.stringify({ dateExpiration }),
+    })
+  }
+
+  async deleteDocument(id: number): Promise<void> {
+    await this.fetch<void>(`/api/documents/${id}`, {
+      method: 'DELETE',
+    })
   }
 
   // ===== Audit =====

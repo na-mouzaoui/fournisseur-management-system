@@ -4,17 +4,452 @@ import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { OperateurEconomique, CreateOperateurRequest, UpdateOperateurRequest, PaginatedResponse } from '@/lib/types'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
+import {
+  OperateurEconomique,
+  CreateOperateurRequest,
+  UpdateOperateurRequest,
+  Document,
+  SecteurActivite,
+  Statut,
+} from '@/lib/types'
 import { apiClient } from '@/lib/api-client'
 import OperateurModal from '@/components/operateur-modal'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import {
   Plus,
   Trash2,
   Edit2,
   Search,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Upload,
+  FileText,
+  Calendar,
+  Building2,
+  MapPin,
+  Phone,
+  Mail,
+  Hash,
+  Lock,
 } from 'lucide-react'
 
 const PAGE_SIZE = 10
+
+interface OperateurEditForm {
+  raisonSociale: string
+  nif: string
+  nis: string
+  registreCommerce: string
+  secteurActiviteId: string
+  adresse: string
+  wilaya: string
+  telephone: string
+  email: string
+  typeOperateur: string
+  formeJuridique: string
+  dateCreationEntreprise: string
+  statutId: string
+  docDates: Record<number, string>
+}
+
+const toDateInputValue = (dateString?: string) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  if (isNaN(date.getTime())) return dateString
+  return date.toISOString().slice(0, 10)
+}
+
+const DOCUMENT_TYPES: { code: string; label: string }[] = [
+  { code: 'REGISTRE_COMMERCE', label: 'Registre de commerce' },
+  { code: 'EXTRAIT_ROLE', label: 'Extrait de rôle' },
+  { code: 'STATUTS_SOCIETE', label: 'Statuts de société' },
+  { code: 'ATTESTATION_NIF', label: 'Attestation NIF' },
+  { code: 'ATTESTATION_NIS', label: 'Attestation NIS' },
+  { code: 'CASIER_JUDICIAIRE', label: 'Casier judiciaire' },
+  { code: 'PIECE_IDENTITE', label: "Pièce d'identité" },
+]
+
+const STATUTS_FOURNISSEUR = ['actif', 'blacklisté', 'archivé']
+
+const docTypeLabel = (code: string) =>
+  DOCUMENT_TYPES.find((t) => t.code === code)?.label || code
+
+const formatDate = (dateString?: string) => {
+  if (!dateString) return '—'
+  const date = new Date(dateString)
+  if (isNaN(date.getTime())) return dateString
+  return date.toLocaleDateString('fr-FR')
+}
+
+function OperateurDocuments({
+  operateurId,
+  archived = false,
+  editing = false,
+  editDocDates,
+  onDocDateChange,
+}: {
+  operateurId: number
+  archived?: boolean
+  editing?: boolean
+  editDocDates?: Record<number, string>
+  onDocDateChange?: (docId: number, value: string) => void
+}) {
+  const [documents, setDocuments] = useState<Document[]>([])
+  const [docsLoading, setDocsLoading] = useState(true)
+  const [upTypeCode, setUpTypeCode] = useState('REGISTRE_COMMERCE')
+  const [upFile, setUpFile] = useState<File | null>(null)
+  const [upDateExpiration, setUpDateExpiration] = useState('')
+  const [upLoading, setUpLoading] = useState(false)
+  const [viewDoc, setViewDoc] = useState<Document | null>(null)
+  const [viewUrl, setViewUrl] = useState<string | null>(null)
+  const [viewLoading, setViewLoading] = useState(false)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [savingDates, setSavingDates] = useState<Record<number, boolean>>({})
+  const [dateInputs, setDateInputs] = useState<Record<number, string>>({})
+  const [dossier, setDossier] = useState<{ id: number; statutId: number; statutLibelle?: string } | null>(null)
+  const [dossierStatuts, setDossierStatuts] = useState<Statut[]>([])
+  const [savingDossierStatut, setSavingDossierStatut] = useState(false)
+
+  const DOSSIER_STATUTS = ['en cours', 'validé', 'rejeté', 'suspendu']
+
+  const loadDocs = useCallback(async () => {
+    setDocsLoading(true)
+    try {
+      const data = await apiClient.getOperateurDocuments(operateurId)
+      setDocuments(data || [])
+      setDateInputs(
+        Object.fromEntries(
+          (data || []).map((d) => [d.id, toDateInputValue(d.dateExpiration)])
+        )
+      )
+    } catch {
+      setDocuments([])
+    } finally {
+      setDocsLoading(false)
+    }
+  }, [operateurId])
+
+  useEffect(() => {
+    loadDocs()
+    apiClient.getDossierByOperateur(operateurId)
+      .then((d) => {
+        if (d && d.id) {
+          setDossier({ id: d.id, statutId: d.statutId, statutLibelle: d.statutLibelle })
+        }
+      })
+      .catch((err) => {
+        console.error('Erreur chargement dossier:', err)
+      })
+    apiClient.getStatuts().then((all) => {
+      const filtered = all.filter((s) => DOSSIER_STATUTS.includes(s.libelle))
+      setDossierStatuts(filtered)
+    }).catch((err) => {
+      console.error('Erreur chargement statuts:', err)
+    })
+  }, [loadDocs, operateurId])
+
+  const handleDossierStatutChange = async (statutId: number) => {
+    if (!dossier) return
+    setSavingDossierStatut(true)
+    try {
+      const updated = await apiClient.updateDossier(dossier.id, { statutId })
+      setDossier({ id: updated.id, statutId: updated.statutId, statutLibelle: updated.statutLibelle })
+    } catch (err) {
+      console.error(err)
+      alert("Erreur lors de la mise à jour du statut du dossier")
+    } finally {
+      setSavingDossierStatut(false)
+    }
+  }
+
+  const handleUpload = async () => {
+    if (!upFile) return
+    setUpLoading(true)
+    try {
+      await apiClient.uploadOperateurDocument(
+        operateurId,
+        upTypeCode,
+        upFile,
+        upDateExpiration || undefined
+      )
+      setUpFile(null)
+      setUpDateExpiration('')
+      loadDocs()
+    } catch (err) {
+      console.error(err)
+      alert("Erreur lors de l'upload du document")
+    } finally {
+      setUpLoading(false)
+    }
+  }
+
+  const handleDownload = async (doc: Document) => {
+    try {
+      const blob = await apiClient.downloadDocument(doc.id)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = doc.nomFichier
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error(err)
+      alert('Erreur lors du téléchargement')
+    }
+  }
+
+  const handleView = async (doc: Document) => {
+    if (viewUrl) window.URL.revokeObjectURL(viewUrl)
+    setViewDoc(doc)
+    setViewUrl(null)
+    setViewLoading(true)
+    try {
+      const blob = await apiClient.downloadDocument(doc.id)
+      setViewUrl(window.URL.createObjectURL(blob))
+    } catch (err) {
+      console.error(err)
+      alert('Erreur lors de la consultation du document')
+    } finally {
+      setViewLoading(false)
+    }
+  }
+
+  const handleCloseView = () => {
+    if (viewUrl) window.URL.revokeObjectURL(viewUrl)
+    setViewUrl(null)
+    setViewDoc(null)
+  }
+
+  const handleDateChange = (doc: Document, value: string) => {
+    setDateInputs((prev) => ({ ...prev, [doc.id]: value }))
+  }
+
+  const handleSaveDate = async (doc: Document, value: string) => {
+    setSavingDates((prev) => ({ ...prev, [doc.id]: true }))
+    try {
+      const updated = await apiClient.updateDocumentDateExpiration(
+        doc.id,
+        value || null
+      )
+      setDocuments((prev) =>
+        prev.map((d) => (d.id === doc.id ? { ...d, dateExpiration: updated.dateExpiration } : d))
+      )
+      setDateInputs((prev) => ({ ...prev, [doc.id]: toDateInputValue(updated.dateExpiration) }))
+    } catch (err) {
+      console.error(err)
+      alert("Erreur lors de la mise à jour de la date d'expiration")
+    } finally {
+      setSavingDates((prev) => ({ ...prev, [doc.id]: false }))
+    }
+  }
+
+  const handleDelete = async (doc: Document) => {
+    if (!window.confirm(`Supprimer le document « ${docTypeLabel(doc.typeCode)} » ?`)) return
+    setDeletingId(doc.id)
+    try {
+      await apiClient.deleteDocument(doc.id)
+      if (viewDoc?.id === doc.id) handleCloseView()
+      setDocuments((prev) => prev.filter((d) => d.id !== doc.id))
+      setDateInputs((prev) => {
+        const next = { ...prev }
+        delete next[doc.id]
+        return next
+      })
+    } catch (err) {
+      console.error(err)
+      alert('Erreur lors de la suppression du document')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {dossier && (
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Statut du dossier :</span>
+          <select
+            value={dossier.statutId}
+            onChange={(e) => handleDossierStatutChange(Number(e.target.value))}
+            disabled={savingDossierStatut}
+            className="px-3 py-1.5 rounded-md border border-input bg-background text-sm h-8"
+          >
+            {dossierStatuts.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.libelle}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {docsLoading ? (
+        <p className="text-sm text-muted-foreground">Chargement des documents...</p>
+      ) : documents.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Aucun document uploadé pour le moment.
+        </p>
+      ) : (
+        <dl className="grid grid-cols-1 gap-2 text-sm">
+          {documents.map((doc) => (
+            <div key={doc.id} className="flex items-center gap-2">
+              <dt className="w-52 text-muted-foreground flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleView(doc)}
+                  title="Consulter le document"
+                  className="group flex items-center gap-1.5 hover:underline"
+                >
+                  <FileText className="h-3.5 w-3.5 text-[#2db34b]" />
+                  {docTypeLabel(doc.typeCode)}
+                </button>
+              </dt>
+              {editing ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    id={`docDate-${doc.id}`}
+                    type="date"
+                    className="w-[160px] h-8"
+                    value={editDocDates?.[doc.id] ?? ''}
+                    onChange={(e) => onDocDateChange?.(doc.id, e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownload(doc)}
+                    title="Télécharger"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <dd className="font-medium flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                    {doc.dateExpiration ? formatDate(doc.dateExpiration) : '—'}
+                  </dd>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownload(doc)}
+                    title="Télécharger"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDelete(doc)}
+                    disabled={deletingId === doc.id}
+                    title="Supprimer le document"
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))}
+        </dl>
+      )}
+
+      <Dialog open={!!viewDoc} onOpenChange={(open) => !open && handleCloseView()}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              {viewDoc ? docTypeLabel(viewDoc.typeCode) : 'Document'}
+            </DialogTitle>
+            <DialogDescription>
+              {viewDoc ? viewDoc.nomFichier : ''}
+              {viewDoc?.dateExpiration
+                ? ` — Expire le ${formatDate(viewDoc.dateExpiration)}`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="h-[70vh] w-full rounded-md border bg-muted/20">
+            {viewLoading ? (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                Chargement du document...
+              </div>
+            ) : viewUrl ? (
+              <iframe
+                src={viewUrl}
+                title={viewDoc?.nomFichier}
+                className="h-full w-full"
+              />
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {!editing && (
+        <div className="rounded-md border p-3 space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase">Uploader un document</p>
+          {archived ? (
+            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+              <Lock size={14} /> Fournisseur archivé : l'ajout de documents est désactivé.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor={`upType-${operateurId}`}>Type de document</Label>
+                <Select
+                  id={`upType-${operateurId}`}
+                  value={upTypeCode}
+                  onChange={(e) => setUpTypeCode(e.target.value)}
+                  disabled={upLoading}
+                >
+                  {DOCUMENT_TYPES.map((t) => (
+                    <option key={t.code} value={t.code}>
+                      {t.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor={`upDate-${operateurId}`}>Date d'expiration</Label>
+                <Input
+                  id={`upDate-${operateurId}`}
+                  type="date"
+                  value={upDateExpiration}
+                  onChange={(e) => setUpDateExpiration(e.target.value)}
+                  disabled={upLoading}
+                />
+              </div>
+            </div>
+          )}
+          {!archived && (
+            <div className="flex items-center gap-2">
+              <Input
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={(e) => setUpFile(e.target.files?.[0] || null)}
+                disabled={upLoading}
+              />
+              <Button type="button" onClick={handleUpload} disabled={upLoading || !upFile}>
+                {upLoading ? 'Upload...' : 'Uploader'}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function SuppliersPage() {
   const [operateurs, setOperateurs] = useState<OperateurEconomique[]>([])
@@ -28,6 +463,17 @@ export default function SuppliersPage() {
   const [selectedOperateur, setSelectedOperateur] = useState<OperateurEconomique | undefined>()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [page, setPage] = useState(1)
+  const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [secteurs, setSecteurs] = useState<SecteurActivite[]>([])
+  const [statuts, setStatuts] = useState<Statut[]>([])
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editForm, setEditForm] = useState<OperateurEditForm | null>(null)
+  const [savingId, setSavingId] = useState<number | null>(null)
+
+  useEffect(() => {
+    apiClient.getSecteurs().then(setSecteurs).catch(() => setSecteurs([]))
+    apiClient.getStatuts().then(setStatuts).catch(() => setStatuts([]))
+  }, [])
 
   const loadOperateurs = useCallback(async () => {
     try {
@@ -57,9 +503,94 @@ export default function SuppliersPage() {
     setIsModalOpen(true)
   }
 
-  const handleEdit = (operateur: OperateurEconomique) => {
-    setSelectedOperateur(operateur)
-    setIsModalOpen(true)
+  const handleStartEdit = async (operateur: OperateurEconomique) => {
+    setExpandedId(operateur.id)
+    let docDates: Record<number, string> = {}
+    try {
+      const docs = await apiClient.getOperateurDocuments(operateur.id)
+      docDates = Object.fromEntries(
+        (docs || []).map((d) => [d.id, toDateInputValue(d.dateExpiration)])
+      )
+    } catch {
+      docDates = {}
+    }
+    setEditForm({
+      raisonSociale: operateur.raisonSociale,
+      nif: operateur.nif || '',
+      nis: operateur.nis || '',
+      registreCommerce: operateur.registreCommerce || '',
+      secteurActiviteId: operateur.secteurActiviteId
+        ? String(operateur.secteurActiviteId)
+        : '',
+      adresse: operateur.adresse || '',
+      wilaya: operateur.wilaya || '',
+      telephone: operateur.telephone || '',
+      email: operateur.email || '',
+      typeOperateur: operateur.typeOperateur || '',
+      formeJuridique: operateur.formeJuridique || '',
+      dateCreationEntreprise: toDateInputValue(operateur.dateCreationEntreprise),
+      statutId: operateur.statutId ? String(operateur.statutId) : '',
+      docDates,
+    })
+    setEditingId(operateur.id)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingId(null)
+    setEditForm(null)
+  }
+
+  const handleEditChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target
+    setEditForm((prev) => (prev ? { ...prev, [name]: value } : prev))
+  }
+
+  const handleDocDateChange = (docId: number, value: string) => {
+    setEditForm((prev) =>
+      prev ? { ...prev, docDates: { ...prev.docDates, [docId]: value } } : prev
+    )
+  }
+
+  const handleSaveEdit = async (operateur: OperateurEconomique) => {
+    if (!editForm) return
+    try {
+      setSavingId(operateur.id)
+      const payload: UpdateOperateurRequest = {
+        raisonSociale: editForm.raisonSociale,
+        typeOperateur: editForm.typeOperateur || undefined,
+        formeJuridique: editForm.formeJuridique || undefined,
+        nif: editForm.nif || undefined,
+        nis: editForm.nis || undefined,
+        registreCommerce: editForm.registreCommerce || undefined,
+        secteurActiviteId: editForm.secteurActiviteId
+          ? Number(editForm.secteurActiviteId)
+          : null,
+        adresse: editForm.adresse || undefined,
+        wilaya: editForm.wilaya || undefined,
+        telephone: editForm.telephone || undefined,
+        email: editForm.email || undefined,
+        dateCreationEntreprise: editForm.dateCreationEntreprise || undefined,
+        dateImmatriculation: operateur.dateImmatriculation,
+        statutId: editForm.statutId ? Number(editForm.statutId) : null,
+      }
+      await apiClient.updateOperateur(operateur.id, payload)
+      const dateEntries = Object.entries(editForm.docDates)
+      await Promise.all(
+        dateEntries.map(([docId, value]) =>
+          apiClient.updateDocumentDateExpiration(Number(docId), value || null)
+        )
+      )
+      setEditingId(null)
+      setEditForm(null)
+      loadOperateurs()
+    } catch (err) {
+      setError("Erreur lors de l'enregistrement de l'opérateur")
+      console.error(err)
+    } finally {
+      setSavingId(null)
+    }
   }
 
   const handleModalSubmit = async (data: CreateOperateurRequest) => {
@@ -82,13 +613,41 @@ export default function SuppliersPage() {
 
   const handleDelete = async (id: number) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cet opérateur?")) return
-
     try {
       await apiClient.deleteOperateur(id)
       loadOperateurs()
     } catch (err) {
       setError("Erreur lors de la suppression de l'opérateur")
       console.error(err)
+    }
+  }
+
+  const handleStatusChange = async (op: OperateurEconomique, statutId: number | null) => {
+    try {
+      setSavingId(op.id)
+      const payload: UpdateOperateurRequest = {
+        raisonSociale: op.raisonSociale,
+        typeOperateur: op.typeOperateur,
+        formeJuridique: op.formeJuridique,
+        nif: op.nif,
+        nis: op.nis,
+        registreCommerce: op.registreCommerce,
+        secteurActiviteId: op.secteurActiviteId ?? null,
+        adresse: op.adresse,
+        wilaya: op.wilaya,
+        telephone: op.telephone,
+        email: op.email,
+        dateCreationEntreprise: op.dateCreationEntreprise,
+        dateImmatriculation: op.dateImmatriculation,
+        statutId: statutId ?? null,
+      }
+      await apiClient.updateOperateur(op.id, payload)
+      loadOperateurs()
+    } catch (err) {
+      setError("Erreur lors du changement de statut")
+      console.error(err)
+    } finally {
+      setSavingId(null)
     }
   }
 
@@ -133,7 +692,7 @@ export default function SuppliersPage() {
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <form onSubmit={handleSearch} className="flex-1">
+            <form onSubmit={handleSearch} className="flex-1 w-full">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
                 <Input
@@ -166,67 +725,357 @@ export default function SuppliersPage() {
               Aucun fournisseur trouvé
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4">N° Immatriculation</th>
-                    <th className="text-left py-3 px-4">Raison sociale</th>
-                    <th className="text-left py-3 px-4">Secteur</th>
-                    <th className="text-left py-3 px-4">Téléphone</th>
-                    <th className="text-left py-3 px-4">Email</th>
-                    <th className="text-left py-3 px-4">Statut</th>
-                    <th className="text-left py-3 px-4">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredOperateurs.map((op) => (
-                    <tr
-                      key={op.id}
-                      className="border-b hover:bg-muted/50 transition-colors"
-                    >
-                      <td className="py-3 px-4 font-medium">{op.numeroImmatriculation}</td>
-                      <td className="py-3 px-4">{op.raisonSociale}</td>
-                      <td className="py-3 px-4">{op.secteurActiviteLibelle || '—'}</td>
-                      <td className="py-3 px-4">{op.telephone || '—'}</td>
-                      <td className="py-3 px-4">{op.email || '—'}</td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${
-                            op.statutLibelle === 'validé'
-                              ? 'bg-[#2db34b] text-white'
-                              : op.statutLibelle === 'en cours' || op.statutLibelle === 'archivé'
-                              ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-                              : op.statutLibelle === 'rejeté' || op.statutLibelle === 'suspendu'
-                              ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
-                              : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-                          }`}
-                        >
-                          {op.statutLibelle || '—'}
+            <div className="space-y-2">
+              {filteredOperateurs.map((op) => {
+                const isExpanded = expandedId === op.id
+                return (
+                  <div
+                    key={op.id}
+                    className={`border rounded-lg transition-colors ${isExpanded ? 'border-[#2db34b]/40 bg-white' : 'hover:bg-muted/40'}`}
+                  >
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedId(isExpanded ? null : op.id)}
+                        className="flex-1 flex items-center gap-3 text-left"
+                      >
+                        <span className="text-[#2db34b]">
+                          {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                         </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEdit(op)}
-                            className="p-1 hover:bg-muted rounded"
-                            title="Modifier"
-                          >
-                            <Edit2 size={16} className="text-[#2db34b]" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(op.id)}
-                            className="p-1 hover:bg-muted rounded"
-                            title="Supprimer"
-                          >
-                            <Trash2 size={16} className="text-red-600" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        <span className="font-medium flex-1 truncate">{op.raisonSociale}</span>
+                        <span className="text-sm text-muted-foreground hidden sm:inline">
+                          {op.numeroImmatriculation}
+                        </span>
+                        {op.isArchived && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                            <Lock size={12} /> Verrouillé
+                          </span>
+                        )}
+                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Select
+                          value={op.statutId ? String(op.statutId) : ''}
+                          onChange={(e) =>
+                            handleStatusChange(op, e.target.value ? Number(e.target.value) : null)
+                          }
+                          disabled={savingId === op.id}
+                          className="h-9 w-auto min-w-[8rem]"
+                          title="Changer le statut"
+                        >
+                          <option value="">-- Statut --</option>
+                          {statuts.filter((s) => STATUTS_FOURNISSEUR.includes(s.libelle)).map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.libelle}
+                            </option>
+                          ))}
+                        </Select>
+                        <button
+                          onClick={() =>
+                            editingId === op.id
+                              ? handleCancelEdit()
+                              : handleStartEdit(op)
+                          }
+                          className={`p-1.5 hover:bg-muted rounded ${editingId === op.id ? 'bg-muted' : ''}`}
+                          title="Modifier"
+                        >
+                          <Edit2 size={16} className="text-[#2db34b]" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(op.id)}
+                          className="p-1.5 hover:bg-muted rounded"
+                          title="Supprimer"
+                        >
+                          <Trash2 size={16} className="text-red-600" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="border-t px-4 py-4 grid gap-6 lg:grid-cols-2">
+                        {editingId === op.id && editForm ? (
+                          <>
+                            <div className="space-y-3">
+                              <p className="text-sm font-semibold text-gray-900">Informations</p>
+                              <div className="grid grid-cols-1 gap-3 text-sm">
+                                <div className="flex gap-2 items-center">
+                                  <dt className="w-44 text-muted-foreground flex items-center gap-1.5 shrink-0">
+                                    <Hash size={14} /> N° Immatriculation
+                                  </dt>
+                                  <dd className="font-medium">{op.numeroImmatriculation}</dd>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <dt className="w-44 text-muted-foreground shrink-0">
+                                    Raison sociale <span className="text-[#e82c2a]">*</span>
+                                  </dt>
+                                  <Input
+                                    name="raisonSociale"
+                                    value={editForm.raisonSociale}
+                                    onChange={handleEditChange}
+                                    disabled={savingId === op.id}
+                                  />
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <dt className="w-44 text-muted-foreground shrink-0">NIF</dt>
+                                  <Input
+                                    name="nif"
+                                    value={editForm.nif}
+                                    onChange={handleEditChange}
+                                    disabled={savingId === op.id}
+                                  />
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <dt className="w-44 text-muted-foreground shrink-0">NIS</dt>
+                                  <Input
+                                    name="nis"
+                                    value={editForm.nis}
+                                    onChange={handleEditChange}
+                                    disabled={savingId === op.id}
+                                  />
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <dt className="w-44 text-muted-foreground shrink-0">
+                                    Registre de commerce
+                                  </dt>
+                                  <Input
+                                    name="registreCommerce"
+                                    value={editForm.registreCommerce}
+                                    onChange={handleEditChange}
+                                    disabled={savingId === op.id}
+                                  />
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <dt className="w-44 text-muted-foreground shrink-0">
+                                    Secteur d'activité
+                                  </dt>
+                                  <Select
+                                    name="secteurActiviteId"
+                                    value={editForm.secteurActiviteId}
+                                    onChange={handleEditChange}
+                                    disabled={savingId === op.id}
+                                  >
+                                    <option value="">-- Sélectionner --</option>
+                                    {secteurs.map((s) => (
+                                      <option key={s.id} value={s.id}>
+                                        {s.libelle}
+                                      </option>
+                                    ))}
+                                  </Select>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <dt className="w-44 text-muted-foreground shrink-0">Type</dt>
+                                  <Input
+                                    name="typeOperateur"
+                                    value={editForm.typeOperateur}
+                                    onChange={handleEditChange}
+                                    disabled={savingId === op.id}
+                                  />
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <dt className="w-44 text-muted-foreground shrink-0">
+                                    Forme juridique
+                                  </dt>
+                                  <Input
+                                    name="formeJuridique"
+                                    value={editForm.formeJuridique}
+                                    onChange={handleEditChange}
+                                    disabled={savingId === op.id}
+                                  />
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <dt className="w-44 text-muted-foreground shrink-0">
+                                    Création entreprise
+                                  </dt>
+                                  <Input
+                                    name="dateCreationEntreprise"
+                                    type="date"
+                                    value={editForm.dateCreationEntreprise}
+                                    onChange={handleEditChange}
+                                    disabled={savingId === op.id}
+                                  />
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <dt className="w-44 text-muted-foreground shrink-0">
+                                    Date d'immatriculation
+                                  </dt>
+                                  <dd className="font-medium">{formatDate(op.dateImmatriculation)}</dd>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <dt className="w-44 text-muted-foreground shrink-0">Statut</dt>
+                                  <Select
+                                    name="statutId"
+                                    value={editForm.statutId}
+                                    onChange={handleEditChange}
+                                    disabled={savingId === op.id}
+                                  >
+                                    <option value="">-- Sélectionner --</option>
+                                    {statuts.filter((s) => STATUTS_FOURNISSEUR.includes(s.libelle)).map((s) => (
+                                      <option key={s.id} value={s.id}>
+                                        {s.libelle}
+                                      </option>
+                                    ))}
+                                  </Select>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <dt className="w-44 text-muted-foreground flex items-center gap-1.5 shrink-0">
+                                    <MapPin size={14} /> Adresse
+                                  </dt>
+                                  <Input
+                                    name="adresse"
+                                    value={editForm.adresse}
+                                    onChange={handleEditChange}
+                                    disabled={savingId === op.id}
+                                  />
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <dt className="w-44 text-muted-foreground shrink-0">Wilaya</dt>
+                                  <Input
+                                    name="wilaya"
+                                    value={editForm.wilaya}
+                                    onChange={handleEditChange}
+                                    disabled={savingId === op.id}
+                                  />
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <dt className="w-44 text-muted-foreground flex items-center gap-1.5 shrink-0">
+                                    <Phone size={14} /> Téléphone
+                                  </dt>
+                                  <Input
+                                    name="telephone"
+                                    value={editForm.telephone}
+                                    onChange={handleEditChange}
+                                    disabled={savingId === op.id}
+                                  />
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <dt className="w-44 text-muted-foreground flex items-center gap-1.5 shrink-0">
+                                    <Mail size={14} /> Email
+                                  </dt>
+                                  <Input
+                                    name="email"
+                                    type="email"
+                                    value={editForm.email}
+                                    onChange={handleEditChange}
+                                    disabled={savingId === op.id}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="space-y-3">
+                              <p className="text-sm font-semibold text-gray-900">Dossiers</p>
+                              <OperateurDocuments
+                                operateurId={op.id}
+                                archived={op.isArchived}
+                                editing
+                                editDocDates={editForm.docDates}
+                                onDocDateChange={handleDocDateChange}
+                              />
+                              <div className="flex items-center justify-end gap-2 pt-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={handleCancelEdit}
+                                  disabled={savingId === op.id}
+                                >
+                                  Annuler
+                                </Button>
+                                <Button
+                                  type="button"
+                                  onClick={() => handleSaveEdit(op)}
+                                  disabled={savingId === op.id}
+                                >
+                                  {savingId === op.id ? 'Enregistrement...' : 'Enregistrer'}
+                                </Button>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="space-y-3">
+                              <p className="text-sm font-semibold text-gray-900">Informations</p>
+                              <dl className="grid grid-cols-1 gap-2 text-sm">
+                                <div className="flex gap-2">
+                                  <dt className="w-44 text-muted-foreground flex items-center gap-1.5">
+                                    <Hash size={14} /> N° Immatriculation
+                                  </dt>
+                                  <dd className="font-medium">{op.numeroImmatriculation || '—'}</dd>
+                                </div>
+                                <div className="flex gap-2">
+                                  <dt className="w-44 text-muted-foreground">Raison sociale</dt>
+                                  <dd className="font-medium">{op.raisonSociale || '—'}</dd>
+                                </div>
+                                <div className="flex gap-2">
+                                  <dt className="w-44 text-muted-foreground">NIF</dt>
+                                  <dd className="font-medium">{op.nif || '—'}</dd>
+                                </div>
+                                <div className="flex gap-2">
+                                  <dt className="w-44 text-muted-foreground">NIS</dt>
+                                  <dd className="font-medium">{op.nis || '—'}</dd>
+                                </div>
+                                <div className="flex gap-2">
+                                  <dt className="w-44 text-muted-foreground">Registre de commerce</dt>
+                                  <dd className="font-medium">{op.registreCommerce || '—'}</dd>
+                                </div>
+                                <div className="flex gap-2">
+                                  <dt className="w-44 text-muted-foreground">Secteur d'activité</dt>
+                                  <dd className="font-medium">{op.secteurActiviteLibelle || '—'}</dd>
+                                </div>
+                                <div className="flex gap-2">
+                                  <dt className="w-44 text-muted-foreground">Date d'immatriculation</dt>
+                                  <dd className="font-medium">{formatDate(op.dateImmatriculation)}</dd>
+                                </div>
+                                <div className="flex gap-2">
+                                  <dt className="w-44 text-muted-foreground">Création entreprise</dt>
+                                  <dd className="font-medium">{formatDate(op.dateCreationEntreprise)}</dd>
+                                </div>
+                                <div className="flex gap-2">
+                                  <dt className="w-44 text-muted-foreground">Statut</dt>
+                                  <dd className="font-medium">{op.statutLibelle || '—'}</dd>
+                                </div>
+                                <div className="flex gap-2">
+                                  <dt className="w-44 text-muted-foreground flex items-center gap-1.5">
+                                    <MapPin size={14} /> Adresse
+                                  </dt>
+                                  <dd className="font-medium">{op.adresse || '—'}</dd>
+                                </div>
+                                <div className="flex gap-2">
+                                  <dt className="w-44 text-muted-foreground">Wilaya</dt>
+                                  <dd className="font-medium">{op.wilaya || '—'}</dd>
+                                </div>
+                                <div className="flex gap-2">
+                                  <dt className="w-44 text-muted-foreground flex items-center gap-1.5">
+                                    <Phone size={14} /> Téléphone
+                                  </dt>
+                                  <dd className="font-medium">{op.telephone || '—'}</dd>
+                                </div>
+                                <div className="flex gap-2">
+                                  <dt className="w-44 text-muted-foreground flex items-center gap-1.5">
+                                    <Mail size={14} /> Email
+                                  </dt>
+                                  <dd className="font-medium">{op.email || '—'}</dd>
+                                </div>
+                                <div className="flex gap-2">
+                                  <dt className="w-44 text-muted-foreground">Type</dt>
+                                  <dd className="font-medium capitalize">{op.typeOperateur || '—'}</dd>
+                                </div>
+                                <div className="flex gap-2">
+                                  <dt className="w-44 text-muted-foreground">Forme juridique</dt>
+                                  <dd className="font-medium">{op.formeJuridique || '—'}</dd>
+                                </div>
+                              </dl>
+                            </div>
+
+                            <div className="space-y-3">
+                              <p className="text-sm font-semibold text-gray-900">Dossiers</p>
+                              <OperateurDocuments operateurId={op.id} archived={op.isArchived} />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
 

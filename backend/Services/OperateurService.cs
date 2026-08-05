@@ -16,7 +16,10 @@ public class OperateurService : IOperateurService
 
     public async Task<OperateurPagedResult> GetAllOperateursAsync(int page, int pageSize, string? search)
     {
-        var query = _context.OperateursEconomiques.AsNoTracking().AsQueryable();
+        var query = _context.OperateursEconomiques
+            .AsNoTracking()
+            .Where(o => o.DateSuppression == null)
+            .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -59,11 +62,11 @@ public class OperateurService : IOperateurService
 
     public async Task<OperateurEconomiqueDto> CreateOperateurAsync(CreateOperateurRequest request, int createdBy)
     {
-        // Statut par défaut : 'en cours' à la création
+        // Statut par défaut : 'actif' à la création
         if (request.StatutId == null)
         {
-            var statutEnCours = await _context.Statuts.FirstOrDefaultAsync(s => s.Libelle == "en cours");
-            request.StatutId = statutEnCours?.Id;
+            var statutActif = await _context.Statuts.FirstOrDefaultAsync(s => s.Libelle == "actif");
+            request.StatutId = statutActif?.Id;
         }
 
         var operateur = new OperateurEconomique
@@ -99,6 +102,9 @@ public class OperateurService : IOperateurService
         if (operateur == null)
             throw new KeyNotFoundException("Opérateur économique non trouvé");
 
+        if (operateur.IsArchived)
+            throw new InvalidOperationException("Opérateur économique archivé et verrouillé");
+
         operateur.RaisonSociale = request.RaisonSociale;
         operateur.TypeOperateur = request.TypeOperateur;
         operateur.FormeJuridique = request.FormeJuridique;
@@ -123,12 +129,26 @@ public class OperateurService : IOperateurService
     public async Task<bool> DeleteOperateurAsync(int id)
     {
         var operateur = await _context.OperateursEconomiques.FindAsync(id);
-        if (operateur == null)
+        if (operateur == null || operateur.DateSuppression != null || operateur.IsArchived)
             return false;
 
-        _context.OperateursEconomiques.Remove(operateur);
+        operateur.DateSuppression = DateTime.UtcNow;
+        operateur.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<OperateurEconomiqueDto> ArchiveOperateurAsync(int id, bool isArchived)
+    {
+        var operateur = await _context.OperateursEconomiques.FindAsync(id);
+        if (operateur == null || operateur.DateSuppression != null)
+            throw new KeyNotFoundException("Opérateur économique non trouvé");
+
+        operateur.IsArchived = isArchived;
+        operateur.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        return await GetOperateurByIdAsync(id) ?? MapToDto(operateur);
     }
 
     public static OperateurEconomiqueDto MapToDto(OperateurEconomique operateur)
@@ -155,7 +175,9 @@ public class OperateurService : IOperateurService
             StatutLibelle = operateur.Statut?.Libelle,
             CreatedBy = operateur.CreatedBy,
             CreatedAt = operateur.CreatedAt,
-            UpdatedAt = operateur.UpdatedAt
+            UpdatedAt = operateur.UpdatedAt,
+            IsArchived = operateur.IsArchived,
+            DateSuppression = operateur.DateSuppression
         };
     }
 }
