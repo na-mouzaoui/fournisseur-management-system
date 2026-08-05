@@ -110,11 +110,7 @@ function LoginFormContent() {
                 {loading ? 'Connexion...' : 'Se connecter'}
               </Button>
 
-              <div className="text-xs text-gray-600 mt-4 p-3 bg-gray-50 rounded-md border border-gray-200">
-                <p className="font-bold mb-2">Comptes de test:</p>
-                <p>Admin: nazim.mouzaoui@gmail.dz / N@zim2002</p>
-                <p>Agent: manager@example.com / Manager@123</p>
-              </div>
+
             </form>
           </CardContent>
         </Card>

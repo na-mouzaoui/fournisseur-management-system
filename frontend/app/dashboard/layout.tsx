@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Sidebar from '@/components/sidebar'
 
-export default function AuthenticatedLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
@@ -21,7 +21,7 @@ export default function AuthenticatedLayout({
   useEffect(() => {
     if (!isMounted || isLoading) return
     if (!isAuthenticated) {
-      router.push('/auth/login')
+      router.push('/login')
     }
   }, [isAuthenticated, isLoading, isMounted, router])
 

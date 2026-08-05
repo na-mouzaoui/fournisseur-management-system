@@ -39,9 +39,9 @@ class ApiClient {
   private handleSessionExpired(): void {
     if (typeof window === 'undefined') return
     localStorage.removeItem('auth_token')
-    const isAlreadyOnLogin = window.location.pathname.startsWith('/auth/login')
+    const isAlreadyOnLogin = window.location.pathname.startsWith('/login')
     if (!isAlreadyOnLogin) {
-      window.location.href = '/auth/login'
+      window.location.href = '/login'
     }
   }
 

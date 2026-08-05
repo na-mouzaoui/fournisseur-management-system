@@ -14,7 +14,7 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     await logout()
-    router.push('/auth/login')
+    router.push('/login')
   }
 
   const isActive = (path: string) => pathname === path
