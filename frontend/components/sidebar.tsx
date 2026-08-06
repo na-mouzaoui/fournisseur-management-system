@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, LogOut, Package, Settings } from 'lucide-react'
+import { LayoutDashboard, LogOut, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth-context'
 import UserProfileMenu from './user-profile-menu'
@@ -17,10 +17,7 @@ export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
 
-  const navItems =
-    user?.role === 'admin'
-      ? [...baseNavItems, { name: 'Administration', href: '/admin', icon: Settings }]
-      : baseNavItems
+  const navItems = baseNavItems
 
   const handleLogout = async () => {
     await logout()

@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,9 +26,6 @@ import {
   Plus,
   Trash2,
   Edit2,
-  Search,
-  ChevronDown,
-  ChevronRight,
   Download,
   Upload,
   FileText,
@@ -40,6 +36,7 @@ import {
   Mail,
   Hash,
   Lock,
+  SlidersHorizontal,
 } from 'lucide-react'
 
 const PAGE_SIZE = 10
@@ -304,7 +301,7 @@ function OperateurDocuments({
         <dl className="grid grid-cols-1 gap-2 text-sm">
           {documents.map((doc) => (
             <div key={doc.id} className="flex items-center gap-2">
-              <dt className="w-52 text-muted-foreground flex items-center gap-1.5 shrink-0">
+              <dt className="text-muted-foreground flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => handleView(doc)}
@@ -316,14 +313,7 @@ function OperateurDocuments({
                 </button>
               </dt>
               {editing ? (
-                <div className="flex items-center gap-2">
-                  <Input
-                    id={`docDate-${doc.id}`}
-                    type="date"
-                    className="w-[160px] h-8"
-                    value={editDocDates?.[doc.id] ?? ''}
-                    onChange={(e) => onDocDateChange?.(doc.id, e.target.value)}
-                  />
+                <>
                   <Button
                     type="button"
                     variant="outline"
@@ -333,13 +323,16 @@ function OperateurDocuments({
                   >
                     <Download className="h-4 w-4" />
                   </Button>
-                </div>
+                  <Input
+                    id={`docDate-${doc.id}`}
+                    type="date"
+                    className="w-[160px] h-8 ml-auto"
+                    value={editDocDates?.[doc.id] ?? ''}
+                    onChange={(e) => onDocDateChange?.(doc.id, e.target.value)}
+                  />
+                </>
               ) : (
-                <div className="flex items-center gap-2">
-                  <dd className="font-medium flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                    {doc.dateExpiration ? formatDate(doc.dateExpiration) : '—'}
-                  </dd>
+                <>
                   <Button
                     type="button"
                     variant="outline"
@@ -360,7 +353,11 @@ function OperateurDocuments({
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
-                </div>
+                  <dd className="font-medium flex items-center gap-1.5 ml-auto shrink-0">
+                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                    {doc.dateExpiration ? formatDate(doc.dateExpiration) : '—'}
+                  </dd>
+                </>
               )}
             </div>
           ))}
@@ -456,9 +453,10 @@ export default function SuppliersPage() {
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [appliedSearch, setAppliedSearch] = useState('')
   const [statutFilter, setStatutFilter] = useState<string>('all')
+  const [wilayaFilter, setWilayaFilter] = useState<string>('all')
+  const [secteurFilter, setSecteurFilter] = useState<string>('all')
+  const [showFilters, setShowFilters] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedOperateur, setSelectedOperateur] = useState<OperateurEconomique | undefined>()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -478,7 +476,7 @@ export default function SuppliersPage() {
   const loadOperateurs = useCallback(async () => {
     try {
       setIsLoading(true)
-      const response = await apiClient.getOperateurs(page, PAGE_SIZE, appliedSearch || undefined)
+      const response = await apiClient.getOperateurs(page, PAGE_SIZE)
       setOperateurs(response.data || [])
       setTotal(response.total || 0)
     } catch (err) {
@@ -487,15 +485,17 @@ export default function SuppliersPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [page, appliedSearch])
+  }, [page])
 
   useEffect(() => {
     loadOperateurs()
   }, [loadOperateurs])
 
   const filteredOperateurs = operateurs.filter((op) => {
-    if (statutFilter === 'all') return true
-    return op.statutLibelle === statutFilter
+    if (statutFilter !== 'all' && op.statutLibelle !== statutFilter) return false
+    if (wilayaFilter !== 'all' && op.wilaya !== wilayaFilter) return false
+    if (secteurFilter !== 'all' && op.secteurActiviteLibelle !== secteurFilter) return false
+    return true
   })
 
   const handleAddNew = () => {
@@ -651,12 +651,6 @@ export default function SuppliersPage() {
     }
   }
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    setPage(1)
-    setAppliedSearch(searchTerm.trim())
-  }
-
   if (isLoading && operateurs.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -677,10 +671,6 @@ export default function SuppliersPage() {
           <h1 className="text-3xl font-bold">Fournisseurs</h1>
           <p className="text-muted-foreground mt-1">Gérez les opérateurs économiques du registre</p>
         </div>
-        <Button onClick={handleAddNew} className="gap-2">
-          <Plus size={18} />
-          Nouveau Fournisseur
-        </Button>
       </div>
 
       {error && (
@@ -689,24 +679,26 @@ export default function SuppliersPage() {
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <form onSubmit={handleSearch} className="flex-1 w-full">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
-                <Input
-                  placeholder="Rechercher par raison sociale, n° d'immatriculation ou wilaya..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </form>
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`p-2 rounded-md border border-input bg-background hover:bg-muted ${showFilters ? 'bg-muted' : ''}`}
+            title="Filtres"
+          >
+            <SlidersHorizontal size={16} />
+          </button>
+          <Button onClick={handleAddNew} className="gap-2" size="sm">
+            <Plus size={16} />
+            Nouveau Fournisseur
+          </Button>
+        </div>
+        {showFilters && (
+          <div className="flex flex-wrap gap-2 mb-4">
             <select
               value={statutFilter}
               onChange={(e) => setStatutFilter(e.target.value)}
-              className="px-3 py-2 rounded-md border border-input bg-background"
+              className="px-3 py-2 rounded-md border border-input bg-background text-sm"
             >
               <option value="all">Tous les statuts</option>
               {Array.from(
@@ -717,42 +709,71 @@ export default function SuppliersPage() {
                 </option>
               ))}
             </select>
+            <select
+              value={wilayaFilter}
+              onChange={(e) => setWilayaFilter(e.target.value)}
+              className="px-3 py-2 rounded-md border border-input bg-background text-sm"
+            >
+              <option value="all">Toutes les wilayas</option>
+              {Array.from(
+                new Set(operateurs.map((o) => o.wilaya).filter(Boolean) as string[])
+              ).sort().map((w) => (
+                <option key={w} value={w}>
+                  {w}
+                </option>
+              ))}
+            </select>
+            <select
+              value={secteurFilter}
+              onChange={(e) => setSecteurFilter(e.target.value)}
+              className="px-3 py-2 rounded-md border border-input bg-background text-sm"
+            >
+              <option value="all">Tous les secteurs</option>
+              {Array.from(
+                new Set(operateurs.map((o) => o.secteurActiviteLibelle).filter(Boolean) as string[])
+              ).sort().map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            {(statutFilter !== 'all' || wilayaFilter !== 'all' || secteurFilter !== 'all') && (
+              <button
+                onClick={() => { setStatutFilter('all'); setWilayaFilter('all'); setSecteurFilter('all') }}
+                className="px-3 py-2 rounded-md border border-input bg-background text-sm text-muted-foreground hover:text-foreground"
+              >
+                Réinitialiser
+              </button>
+            )}
           </div>
-        </CardHeader>
-        <CardContent>
-          {filteredOperateurs.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Aucun fournisseur trouvé
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {filteredOperateurs.map((op) => {
-                const isExpanded = expandedId === op.id
-                return (
-                  <div
-                    key={op.id}
-                    className={`border rounded-lg transition-colors ${isExpanded ? 'border-[#2db34b]/40 bg-white' : 'hover:bg-muted/40'}`}
-                  >
-                    <div className="flex items-center gap-3 px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={() => setExpandedId(isExpanded ? null : op.id)}
-                        className="flex-1 flex items-center gap-3 text-left"
-                      >
-                        <span className="text-[#2db34b]">
-                          {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+        )}
+        {filteredOperateurs.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            Aucun fournisseur trouvé
+          </div>
+        ) : (
+          <div className="border rounded-lg divide-y">
+            {filteredOperateurs.map((op) => {
+              const isExpanded = expandedId === op.id
+              return (
+                <div
+                  key={op.id}
+                  className={`transition-colors ${isExpanded ? 'bg-white' : ''}`}
+                >
+                    <div
+                      className="flex items-center gap-3 px-4 py-3 cursor-pointer"
+                      onClick={() => setExpandedId(isExpanded ? null : op.id)}
+                    >
+                      <span className="text-sm text-muted-foreground shrink-0">
+                        {op.numeroImmatriculation}
+                      </span>
+                      <span className="font-medium flex-1 truncate">{op.raisonSociale}</span>
+                      {op.isArchived && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 shrink-0">
+                          <Lock size={12} /> Verrouillé
                         </span>
-                        <span className="font-medium flex-1 truncate">{op.raisonSociale}</span>
-                        <span className="text-sm text-muted-foreground hidden sm:inline">
-                          {op.numeroImmatriculation}
-                        </span>
-                        {op.isArchived && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
-                            <Lock size={12} /> Verrouillé
-                          </span>
-                        )}
-                      </button>
-                      <div className="flex items-center gap-1 shrink-0">
+                      )}
+                      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <Select
                           value={op.statutId ? String(op.statutId) : ''}
                           onChange={(e) =>
@@ -1102,8 +1123,7 @@ export default function SuppliersPage() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
       <OperateurModal
         isOpen={isModalOpen}

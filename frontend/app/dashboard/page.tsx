@@ -106,44 +106,29 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
-            <CardTitle className="text-sm font-semibold">
-              Nouveaux fournisseurs (30 jours)
-            </CardTitle>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2db34b]/10">
-              <TrendingUp className="h-4 w-4" style={{ color: '#2db34b' }} />
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-sm font-semibold">
+                Fournisseurs par secteur
+              </CardTitle>
+              <Select
+                value={selectedSector}
+                onChange={(e) => setSelectedSector(e.target.value)}
+                className="h-8 text-xs min-w-[10rem]"
+              >
+                {stats.repartitionSecteurs.map((d) => (
+                  <option key={d.secteur} value={d.secteur}>
+                    {d.secteur}
+                  </option>
+                ))}
+              </Select>
             </div>
-          </CardHeader>
-          <CardContent className="pt-1 pb-3">
-            <div className="text-4xl font-bold leading-none" style={{ color: '#2db34b' }}>
-              {stats.nouveaux30Jours}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
-            <CardTitle className="text-sm font-semibold">
-              Répartition par secteur
-            </CardTitle>
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2db34b]/10">
               <PieChart className="h-4 w-4" style={{ color: '#2db34b' }} />
             </div>
           </CardHeader>
-          <CardContent className="pt-1 pb-3 space-y-3">
-            <Select
-              value={selectedSector}
-              onChange={(e) => setSelectedSector(e.target.value)}
-            >
-              {stats.repartitionSecteurs.map((d) => (
-                <option key={d.secteur} value={d.secteur}>
-                  {d.secteur}
-                </option>
-              ))}
-            </Select>
-            <div className="text-center">
-              <div className="text-4xl font-bold leading-none" style={{ color: '#2db34b' }}>
-                {selectedSectorCount}
-              </div>
+          <CardContent className="pt-1 pb-3">
+            <div className="text-4xl font-bold leading-none" style={{ color: '#2db34b' }}>
+              {selectedSectorCount}
             </div>
           </CardContent>
         </Card>
