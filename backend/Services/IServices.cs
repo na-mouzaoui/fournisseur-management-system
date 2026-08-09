@@ -17,6 +17,8 @@ public interface IOperateurService
     Task<OperateurEconomiqueDto> UpdateOperateurAsync(int id, UpdateOperateurRequest request);
     Task<bool> DeleteOperateurAsync(int id);
     Task<OperateurEconomiqueDto> ArchiveOperateurAsync(int id, bool isArchived);
+    Task<BlacklistEntryDto> BlacklistOperateurAsync(int id, BlacklistRequest request, int userId);
+    Task<OperateurEconomiqueDto> ReactivateOperateurAsync(int id);
 }
 
 public interface IDossierService
@@ -61,4 +63,11 @@ public interface IUtilisateurService
     Task<UtilisateurDto> UpdateUtilisateurAsync(int id, UpdateUtilisateurRequest request);
     Task<bool> DeleteUtilisateurAsync(int id);
     Task<bool> ResetPasswordAsync(int id, ResetPasswordRequest request);
+}
+
+public interface IEvaluationService
+{
+    Task<List<EvaluationDto>> GetByOperateurAsync(int operateurId);
+    Task<EvaluationStatsDto> GetStatsAsync(int operateurId);
+    Task<EvaluationDto> CreateAsync(CreateEvaluationRequest request, int evaluateurId);
 }

@@ -31,6 +31,7 @@ public class ReferentielService : IReferentielService
         return secteurs.Select(s => new SecteurActiviteDto
         {
             Id = s.Id,
+            Code = s.Code,
             Libelle = s.Libelle
         }).ToList();
     }

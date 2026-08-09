@@ -6,6 +6,8 @@ public class OperateurEconomique
     public string NumeroImmatriculation { get; set; } = string.Empty;
     public string RaisonSociale { get; set; } = string.Empty;
     public string? TypeOperateur { get; set; }
+    public string? TypeFournisseur { get; set; }
+    public string? Gerant { get; set; }
     public string? FormeJuridique { get; set; }
     public string? Nif { get; set; }
     public string? Nis { get; set; }

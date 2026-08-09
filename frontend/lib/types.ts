@@ -54,12 +54,15 @@ export interface OperateurEconomique {
   numeroImmatriculation: string
   raisonSociale: string
   typeOperateur?: string
+  typeFournisseur?: string
+  gerant?: string
   formeJuridique?: string
   nif?: string
   nis?: string
   registreCommerce?: string
   secteurActiviteId?: number
   secteurActiviteLibelle?: string
+  secteurActiviteCode?: string
   adresse?: string
   wilaya?: string
   telephone?: string
@@ -79,6 +82,8 @@ export interface CreateOperateurRequest {
   numeroImmatriculation: string
   raisonSociale: string
   typeOperateur?: string
+  typeFournisseur?: string
+  gerant?: string
   formeJuridique?: string
   nif?: string
   nis?: string
@@ -96,6 +101,8 @@ export interface CreateOperateurRequest {
 export interface UpdateOperateurRequest {
   raisonSociale: string
   typeOperateur?: string
+  typeFournisseur?: string
+  gerant?: string
   formeJuridique?: string
   nif?: string
   nis?: string
@@ -178,12 +185,44 @@ export interface Role {
 
 export interface SecteurActivite {
   id: number
+  code: string
   libelle: string
 }
 
 export interface Statut {
   id: number
   libelle: string
+}
+
+export interface BlacklistEntry {
+  id: number
+  operateurId: number
+  motif: string
+  dateDebut: string
+  dateFin?: string
+  createdBy?: number
+  createdAt: string
+}
+
+export interface Evaluation {
+  id: number
+  operateurId: number
+  operateurRaisonSociale?: string
+  noteQualite: number
+  noteDelai: number
+  notePrix: number
+  noteService: number
+  noteGlobale: number
+  commentaire?: string
+  evaluateurId?: number
+  evaluateurNom?: string
+  dateEvaluation: string
+}
+
+export interface EvaluationStats {
+  totalEvaluations: number
+  noteGlobaleActuelle?: number
+  derniereNote?: number
 }
 
 // ===== Pagination =====

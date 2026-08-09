@@ -19,6 +19,9 @@ import {
   PaginatedResponse,
   DashboardStats,
   AuditLog,
+  BlacklistEntry,
+  Evaluation,
+  EvaluationStats,
 } from './types'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
@@ -154,6 +157,22 @@ class ApiClient {
     return this.fetch<OperateurEconomique>(`/api/operateurs/${id}/archive`, {
       method: 'POST',
       body: JSON.stringify({ isArchived }),
+    })
+  }
+
+  async blacklistOperateur(
+    id: number,
+    data: { motif: string; dateDebut: string; dateFin?: string }
+  ): Promise<BlacklistEntry> {
+    return this.fetch<BlacklistEntry>(`/api/operateurs/${id}/blacklist`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async reactivateOperateur(id: number): Promise<OperateurEconomique> {
+    return this.fetch<OperateurEconomique>(`/api/operateurs/${id}/reactivate`, {
+      method: 'POST',
     })
   }
 
@@ -397,6 +416,29 @@ class ApiClient {
   async markNotificationAsRead(id: number): Promise<void> {
     await this.fetch<void>(`/api/notifications/${id}/read`, {
       method: 'PATCH',
+    })
+  }
+
+  // ===== Evaluations =====
+  async getEvaluationsByOperateur(operateurId: number): Promise<Evaluation[]> {
+    return this.fetch<Evaluation[]>(`/api/evaluations/operateur/${operateurId}`)
+  }
+
+  async getEvaluationStats(operateurId: number): Promise<EvaluationStats> {
+    return this.fetch<EvaluationStats>(`/api/evaluations/operateur/${operateurId}/stats`)
+  }
+
+  async createEvaluation(data: {
+    operateurId: number
+    noteQualite: number
+    noteDelai: number
+    notePrix: number
+    noteService: number
+    commentaire?: string
+  }): Promise<Evaluation> {
+    return this.fetch<Evaluation>('/api/evaluations', {
+      method: 'POST',
+      body: JSON.stringify(data),
     })
   }
 }

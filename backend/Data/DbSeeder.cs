@@ -37,10 +37,10 @@ public static class DbSeeder
 
         // Referentiel des secteurs d'activité
         context.SecteursActivite.AddRange(
-            new SecteurActivite { Libelle = "Informatique" },
-            new SecteurActivite { Libelle = "Bâtiment" },
-            new SecteurActivite { Libelle = "Logistique" },
-            new SecteurActivite { Libelle = "Énergie" }
+            new SecteurActivite { Code = "INFO", Libelle = "Informatique" },
+            new SecteurActivite { Code = "BAT", Libelle = "Bâtiment" },
+            new SecteurActivite { Code = "LOG", Libelle = "Logistique" },
+            new SecteurActivite { Code = "ENE", Libelle = "Énergie" }
         );
 
         context.SaveChanges();

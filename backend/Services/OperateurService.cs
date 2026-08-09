@@ -74,6 +74,8 @@ public class OperateurService : IOperateurService
             NumeroImmatriculation = request.NumeroImmatriculation,
             RaisonSociale = request.RaisonSociale,
             TypeOperateur = request.TypeOperateur,
+            TypeFournisseur = request.TypeFournisseur,
+            Gerant = request.Gerant,
             FormeJuridique = request.FormeJuridique,
             Nif = request.Nif,
             Nis = request.Nis,
@@ -107,6 +109,8 @@ public class OperateurService : IOperateurService
 
         operateur.RaisonSociale = request.RaisonSociale;
         operateur.TypeOperateur = request.TypeOperateur;
+        operateur.TypeFournisseur = request.TypeFournisseur;
+        operateur.Gerant = request.Gerant;
         operateur.FormeJuridique = request.FormeJuridique;
         operateur.Nif = request.Nif;
         operateur.Nis = request.Nis;
@@ -146,6 +150,72 @@ public class OperateurService : IOperateurService
 
         operateur.IsArchived = isArchived;
         operateur.UpdatedAt = DateTime.UtcNow;
+
+        if (isArchived)
+        {
+            var statutArchive = await _context.Statuts.FirstOrDefaultAsync(s => s.Libelle == "archivé");
+            if (statutArchive != null)
+                operateur.StatutId = statutArchive.Id;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return await GetOperateurByIdAsync(id) ?? MapToDto(operateur);
+    }
+
+    public async Task<BlacklistEntryDto> BlacklistOperateurAsync(int id, BlacklistRequest request, int userId)
+    {
+        var operateur = await _context.OperateursEconomiques.FindAsync(id);
+        if (operateur == null || operateur.DateSuppression != null)
+            throw new KeyNotFoundException("Opérateur économique non trouvé");
+
+        var statutBlackliste = await _context.Statuts.FirstOrDefaultAsync(s => s.Libelle == "blacklisté");
+        if (statutBlackliste == null)
+            throw new InvalidOperationException("Statut 'blacklisté' non trouvé");
+
+        var entry = new BlacklistEntry
+        {
+            OperateurId = id,
+            Motif = request.Motif,
+            DateDebut = request.DateDebut,
+            DateFin = request.DateFin,
+            CreatedBy = userId,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.BlacklistEntries.Add(entry);
+
+        operateur.StatutId = statutBlackliste.Id;
+        operateur.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return new BlacklistEntryDto
+        {
+            Id = entry.Id,
+            OperateurId = entry.OperateurId,
+            Motif = entry.Motif,
+            DateDebut = entry.DateDebut,
+            DateFin = entry.DateFin,
+            CreatedBy = entry.CreatedBy,
+            CreatedAt = entry.CreatedAt
+        };
+    }
+
+    public async Task<OperateurEconomiqueDto> ReactivateOperateurAsync(int id)
+    {
+        var operateur = await _context.OperateursEconomiques.FindAsync(id);
+        if (operateur == null || operateur.DateSuppression != null)
+            throw new KeyNotFoundException("Opérateur économique non trouvé");
+
+        var statutActif = await _context.Statuts.FirstOrDefaultAsync(s => s.Libelle == "actif");
+        if (statutActif == null)
+            throw new InvalidOperationException("Statut 'actif' non trouvé");
+
+        operateur.StatutId = statutActif.Id;
+        operateur.IsArchived = false;
+        operateur.UpdatedAt = DateTime.UtcNow;
+
         await _context.SaveChangesAsync();
 
         return await GetOperateurByIdAsync(id) ?? MapToDto(operateur);
@@ -159,12 +229,15 @@ public class OperateurService : IOperateurService
             NumeroImmatriculation = operateur.NumeroImmatriculation,
             RaisonSociale = operateur.RaisonSociale,
             TypeOperateur = operateur.TypeOperateur,
+            TypeFournisseur = operateur.TypeFournisseur,
+            Gerant = operateur.Gerant,
             FormeJuridique = operateur.FormeJuridique,
             Nif = operateur.Nif,
             Nis = operateur.Nis,
             RegistreCommerce = operateur.RegistreCommerce,
             SecteurActiviteId = operateur.SecteurActiviteId,
             SecteurActiviteLibelle = operateur.SecteurActivite?.Libelle,
+            SecteurActiviteCode = operateur.SecteurActivite?.Code,
             Adresse = operateur.Adresse,
             Wilaya = operateur.Wilaya,
             Telephone = operateur.Telephone,

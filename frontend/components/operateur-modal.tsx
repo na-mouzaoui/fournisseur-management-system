@@ -24,13 +24,9 @@ import { Select } from './ui/select'
 import { Download, Upload, FileText, Calendar, Trash2, X } from 'lucide-react'
 
 const DOCUMENT_TYPES: { code: string; label: string }[] = [
-  { code: 'REGISTRE_COMMERCE', label: 'Registre de commerce' },
-  { code: 'EXTRAIT_ROLE', label: 'Extrait de rôle' },
-  { code: 'STATUTS_SOCIETE', label: 'Statuts de société' },
-  { code: 'ATTESTATION_NIF', label: 'Attestation NIF' },
-  { code: 'ATTESTATION_NIS', label: 'Attestation NIS' },
-  { code: 'CASIER_JUDICIAIRE', label: 'Casier judiciaire' },
-  { code: 'PIECE_IDENTITE', label: "Pièce d'identité" },
+  { code: 'VALIDITE_COTISATIONS_CNAS', label: 'Validité des cotisations sociales CNAS / CASNOS' },
+  { code: 'CERTIFICAT_MISE_A_JOUR_FISCAL', label: 'Certificat de mise à jour / Attestation fiscale' },
+  { code: 'CERTIFICAT_QUALIFICATION', label: 'Certificat de qualification / Agrément ou certification ISO 9001' },
 ]
 
 interface OperateurModalProps {
@@ -48,6 +44,8 @@ interface OperateurForm {
   nis: string
   registreCommerce: string
   secteurActiviteId: string
+  typeFournisseur: string
+  gerant: string
   adresse: string
   telephone: string
   email: string
@@ -61,6 +59,8 @@ const emptyForm: OperateurForm = {
   nis: '',
   registreCommerce: '',
   secteurActiviteId: '',
+  typeFournisseur: '',
+  gerant: '',
   adresse: '',
   telephone: '',
   email: '',
@@ -249,6 +249,8 @@ export default function OperateurModal({
         secteurActiviteId: operateur.secteurActiviteId
           ? String(operateur.secteurActiviteId)
           : '',
+        typeFournisseur: operateur.typeFournisseur || '',
+        gerant: operateur.gerant || '',
         adresse: operateur.adresse || '',
         telephone: operateur.telephone || '',
         email: operateur.email || '',
@@ -280,6 +282,8 @@ export default function OperateurModal({
       secteurActiviteId: formData.secteurActiviteId
         ? Number(formData.secteurActiviteId)
         : null,
+      typeFournisseur: formData.typeFournisseur || undefined,
+      gerant: formData.gerant || undefined,
       adresse: formData.adresse || undefined,
       telephone: formData.telephone || undefined,
       email: formData.email || undefined,
@@ -386,10 +390,39 @@ export default function OperateurModal({
                 <option value="">-- Sélectionner --</option>
                 {secteurs.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.libelle}
+                    {s.code ? `${s.code} - ` : ''}{s.libelle}
                   </option>
                 ))}
               </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="typeFournisseur">Type fournisseur</Label>
+              <Select
+                id="typeFournisseur"
+                name="typeFournisseur"
+                value={formData.typeFournisseur}
+                onChange={handleChange}
+                disabled={isLoading}
+              >
+                <option value="">-- Sélectionner --</option>
+                <option value="Local">Local</option>
+                <option value="International">International</option>
+                <option value="Sous-traitant">Sous-traitant</option>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="gerant">Gérant</Label>
+              <Input
+                id="gerant"
+                name="gerant"
+                value={formData.gerant}
+                onChange={handleChange}
+                disabled={isLoading}
+                placeholder="Nom du gérant"
+              />
             </div>
           </div>
 

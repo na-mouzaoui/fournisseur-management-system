@@ -92,4 +92,41 @@ public class OperateurController : ControllerBase
             return NotFound();
         }
     }
+
+    [HttpPost("{id}/blacklist")]
+    public async Task<ActionResult<BlacklistEntryDto>> Blacklist(int id, [FromBody] BlacklistRequest request)
+    {
+        try
+        {
+            var userId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+            var entry = await _operateurService.BlacklistOperateurAsync(id, request, userId);
+            return Ok(entry);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("{id}/reactivate")]
+    public async Task<ActionResult<OperateurEconomiqueDto>> Reactivate(int id)
+    {
+        try
+        {
+            var operateur = await _operateurService.ReactivateOperateurAsync(id);
+            return Ok(operateur);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

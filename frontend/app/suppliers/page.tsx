@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -30,13 +31,16 @@ import {
   Upload,
   FileText,
   Calendar,
-  Building2,
   MapPin,
   Phone,
   Mail,
   Hash,
   Lock,
   SlidersHorizontal,
+  Ban,
+  Archive,
+  RefreshCw,
+  ChevronDown,
 } from 'lucide-react'
 
 const PAGE_SIZE = 10
@@ -44,14 +48,12 @@ const PAGE_SIZE = 10
 interface OperateurEditForm {
   raisonSociale: string
   nif: string
-  nis: string
-  registreCommerce: string
   secteurActiviteId: string
+  typeFournisseur: string
+  gerant: string
   adresse: string
-  wilaya: string
   telephone: string
   email: string
-  typeOperateur: string
   formeJuridique: string
   dateCreationEntreprise: string
   statutId: string
@@ -66,16 +68,28 @@ const toDateInputValue = (dateString?: string) => {
 }
 
 const DOCUMENT_TYPES: { code: string; label: string }[] = [
-  { code: 'REGISTRE_COMMERCE', label: 'Registre de commerce' },
-  { code: 'EXTRAIT_ROLE', label: 'Extrait de rôle' },
-  { code: 'STATUTS_SOCIETE', label: 'Statuts de société' },
-  { code: 'ATTESTATION_NIF', label: 'Attestation NIF' },
-  { code: 'ATTESTATION_NIS', label: 'Attestation NIS' },
-  { code: 'CASIER_JUDICIAIRE', label: 'Casier judiciaire' },
-  { code: 'PIECE_IDENTITE', label: "Pièce d'identité" },
+  { code: 'VALIDITE_COTISATIONS_CNAS', label: 'Validité des cotisations sociales CNAS / CASNOS' },
+  { code: 'CERTIFICAT_MISE_A_JOUR_FISCAL', label: 'Certificat de mise à jour / Attestation fiscale' },
+  { code: 'CERTIFICAT_QUALIFICATION', label: 'Certificat de qualification / Agrément ou certification ISO 9001' },
 ]
 
 const STATUTS_FOURNISSEUR = ['actif', 'blacklisté', 'archivé']
+
+function StatutBadge({ statut }: { statut?: string }) {
+  const classes =
+    statut === 'actif'
+      ? 'bg-[#2db34b] text-white'
+      : statut === 'blacklisté'
+      ? 'bg-red-100 text-red-800'
+      : statut === 'archivé'
+      ? 'bg-gray-100 text-gray-700'
+      : 'bg-gray-100 text-gray-700'
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${classes}`}>
+      {statut || '—'}
+    </span>
+  )
+}
 
 const docTypeLabel = (code: string) =>
   DOCUMENT_TYPES.find((t) => t.code === code)?.label || code
@@ -87,7 +101,7 @@ const formatDate = (dateString?: string) => {
   return date.toLocaleDateString('fr-FR')
 }
 
-function OperateurDocuments({
+export function OperateurDocuments({
   operateurId,
   archived = false,
   editing = false,
@@ -102,16 +116,14 @@ function OperateurDocuments({
 }) {
   const [documents, setDocuments] = useState<Document[]>([])
   const [docsLoading, setDocsLoading] = useState(true)
-  const [upTypeCode, setUpTypeCode] = useState('REGISTRE_COMMERCE')
-  const [upFile, setUpFile] = useState<File | null>(null)
-  const [upDateExpiration, setUpDateExpiration] = useState('')
-  const [upLoading, setUpLoading] = useState(false)
+  const [uploadingType, setUploadingType] = useState<string | null>(null)
+  const [upFiles, setUpFiles] = useState<Record<string, File | null>>({})
+  const [upDates, setUpDates] = useState<Record<string, string>>({})
+  const [upLoading, setUpLoading] = useState<string | null>(null)
   const [viewDoc, setViewDoc] = useState<Document | null>(null)
   const [viewUrl, setViewUrl] = useState<string | null>(null)
   const [viewLoading, setViewLoading] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
-  const [savingDates, setSavingDates] = useState<Record<number, boolean>>({})
-  const [dateInputs, setDateInputs] = useState<Record<number, string>>({})
   const [dossier, setDossier] = useState<{ id: number; statutId: number; statutLibelle?: string } | null>(null)
   const [dossierStatuts, setDossierStatuts] = useState<Statut[]>([])
   const [savingDossierStatut, setSavingDossierStatut] = useState(false)
@@ -123,11 +135,6 @@ function OperateurDocuments({
     try {
       const data = await apiClient.getOperateurDocuments(operateurId)
       setDocuments(data || [])
-      setDateInputs(
-        Object.fromEntries(
-          (data || []).map((d) => [d.id, toDateInputValue(d.dateExpiration)])
-        )
-      )
     } catch {
       setDocuments([])
     } finally {
@@ -168,24 +175,26 @@ function OperateurDocuments({
     }
   }
 
-  const handleUpload = async () => {
-    if (!upFile) return
-    setUpLoading(true)
+  const handleUpload = async (typeCode: string) => {
+    const file = upFiles[typeCode]
+    if (!file) return
+    setUpLoading(typeCode)
     try {
       await apiClient.uploadOperateurDocument(
         operateurId,
-        upTypeCode,
-        upFile,
-        upDateExpiration || undefined
+        typeCode,
+        file,
+        upDates[typeCode] || undefined
       )
-      setUpFile(null)
-      setUpDateExpiration('')
+      setUpFiles((prev) => ({ ...prev, [typeCode]: null }))
+      setUpDates((prev) => ({ ...prev, [typeCode]: '' }))
+      setUploadingType(null)
       loadDocs()
     } catch (err) {
       console.error(err)
       alert("Erreur lors de l'upload du document")
     } finally {
-      setUpLoading(false)
+      setUpLoading(null)
     }
   }
 
@@ -228,29 +237,6 @@ function OperateurDocuments({
     setViewDoc(null)
   }
 
-  const handleDateChange = (doc: Document, value: string) => {
-    setDateInputs((prev) => ({ ...prev, [doc.id]: value }))
-  }
-
-  const handleSaveDate = async (doc: Document, value: string) => {
-    setSavingDates((prev) => ({ ...prev, [doc.id]: true }))
-    try {
-      const updated = await apiClient.updateDocumentDateExpiration(
-        doc.id,
-        value || null
-      )
-      setDocuments((prev) =>
-        prev.map((d) => (d.id === doc.id ? { ...d, dateExpiration: updated.dateExpiration } : d))
-      )
-      setDateInputs((prev) => ({ ...prev, [doc.id]: toDateInputValue(updated.dateExpiration) }))
-    } catch (err) {
-      console.error(err)
-      alert("Erreur lors de la mise à jour de la date d'expiration")
-    } finally {
-      setSavingDates((prev) => ({ ...prev, [doc.id]: false }))
-    }
-  }
-
   const handleDelete = async (doc: Document) => {
     if (!window.confirm(`Supprimer le document « ${docTypeLabel(doc.typeCode)} » ?`)) return
     setDeletingId(doc.id)
@@ -258,11 +244,6 @@ function OperateurDocuments({
       await apiClient.deleteDocument(doc.id)
       if (viewDoc?.id === doc.id) handleCloseView()
       setDocuments((prev) => prev.filter((d) => d.id !== doc.id))
-      setDateInputs((prev) => {
-        const next = { ...prev }
-        delete next[doc.id]
-        return next
-      })
     } catch (err) {
       console.error(err)
       alert('Erreur lors de la suppression du document')
@@ -270,6 +251,8 @@ function OperateurDocuments({
       setDeletingId(null)
     }
   }
+
+  const getDocForType = (typeCode: string) => documents.find((d) => d.typeCode === typeCode)
 
   return (
     <div className="space-y-3">
@@ -293,75 +276,128 @@ function OperateurDocuments({
 
       {docsLoading ? (
         <p className="text-sm text-muted-foreground">Chargement des documents...</p>
-      ) : documents.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Aucun document uploadé pour le moment.
-        </p>
       ) : (
-        <dl className="grid grid-cols-1 gap-2 text-sm">
-          {documents.map((doc) => (
-            <div key={doc.id} className="flex items-center gap-2">
-              <dt className="text-muted-foreground flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handleView(doc)}
-                  title="Consulter le document"
-                  className="group flex items-center gap-1.5 hover:underline"
-                >
-                  <FileText className="h-3.5 w-3.5 text-[#2db34b]" />
-                  {docTypeLabel(doc.typeCode)}
-                </button>
-              </dt>
-              {editing ? (
-                <>
+        <div className="space-y-2">
+          {DOCUMENT_TYPES.map((type) => {
+            const doc = getDocForType(type.code)
+            const isUploading = uploadingType === type.code
+
+            if (doc) {
+              return (
+                <div key={type.code} className="flex items-center gap-2 py-2 border-b last:border-b-0">
+                  <span className="text-muted-foreground flex items-center gap-1.5 shrink-0">
+                    <FileText className="h-3.5 w-3.5 text-[#2db34b]" />
+                    {type.label}
+                  </span>
+                  {editing ? (
+                    <>
+                      <Input
+                        id={`docDate-${doc.id}`}
+                        type="date"
+                        className="w-[160px] h-8 ml-auto"
+                        value={editDocDates?.[doc.id] ?? ''}
+                        onChange={(e) => onDocDateChange?.(doc.id, e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownload(doc)}
+                        title="Télécharger"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-medium flex items-center gap-1.5 ml-auto shrink-0 text-sm">
+                        <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                        {doc.dateExpiration ? formatDate(doc.dateExpiration) : '—'}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownload(doc)}
+                        title="Télécharger"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDelete(doc)}
+                        disabled={deletingId === doc.id}
+                        title="Supprimer le document"
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )
+            }
+
+            return (
+              <div key={type.code} className="flex items-center gap-2 py-2 border-b last:border-b-0">
+                <span className="text-muted-foreground flex items-center gap-1.5 shrink-0">
+                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                  {type.label}
+                </span>
+                {archived ? (
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    <Lock size={12} className="inline mr-1" />Archivé
+                  </span>
+                ) : isUploading ? (
+                  <div className="flex items-center gap-2 ml-auto">
+                    <Input
+                      type="date"
+                      className="w-[140px] h-8"
+                      value={upDates[type.code] || ''}
+                      onChange={(e) => setUpDates((prev) => ({ ...prev, [type.code]: e.target.value }))}
+                      placeholder="Date expiration"
+                    />
+                    <Input
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg"
+                      className="w-[200px] h-8"
+                      onChange={(e) => setUpFiles((prev) => ({ ...prev, [type.code]: e.target.files?.[0] || null }))}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => handleUpload(type.code)}
+                      disabled={upLoading === type.code || !upFiles[type.code]}
+                    >
+                      {upLoading === type.code ? '...' : 'Confirmer'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setUploadingType(null); setUpFiles((prev) => ({ ...prev, [type.code]: null })) }}
+                    >
+                      Annuler
+                    </Button>
+                  </div>
+                ) : (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDownload(doc)}
-                    title="Télécharger"
+                    className="ml-auto"
+                    onClick={() => setUploadingType(type.code)}
                   >
-                    <Download className="h-4 w-4" />
+                    <Upload className="h-4 w-4 mr-1" />
+                    Importer
                   </Button>
-                  <Input
-                    id={`docDate-${doc.id}`}
-                    type="date"
-                    className="w-[160px] h-8 ml-auto"
-                    value={editDocDates?.[doc.id] ?? ''}
-                    onChange={(e) => onDocDateChange?.(doc.id, e.target.value)}
-                  />
-                </>
-              ) : (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDownload(doc)}
-                    title="Télécharger"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDelete(doc)}
-                    disabled={deletingId === doc.id}
-                    title="Supprimer le document"
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                  <dd className="font-medium flex items-center gap-1.5 ml-auto shrink-0">
-                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                    {doc.dateExpiration ? formatDate(doc.dateExpiration) : '—'}
-                  </dd>
-                </>
-              )}
-            </div>
-          ))}
-        </dl>
+                )}
+              </div>
+            )
+          })}
+        </div>
       )}
 
       <Dialog open={!!viewDoc} onOpenChange={(open) => !open && handleCloseView()}>
@@ -392,69 +428,17 @@ function OperateurDocuments({
           </div>
         </DialogContent>
       </Dialog>
-
-      {!editing && (
-        <div className="rounded-md border p-3 space-y-3">
-          <p className="text-xs font-semibold text-muted-foreground uppercase">Uploader un document</p>
-          {archived ? (
-            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-              <Lock size={14} /> Fournisseur archivé : l'ajout de documents est désactivé.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor={`upType-${operateurId}`}>Type de document</Label>
-                <Select
-                  id={`upType-${operateurId}`}
-                  value={upTypeCode}
-                  onChange={(e) => setUpTypeCode(e.target.value)}
-                  disabled={upLoading}
-                >
-                  {DOCUMENT_TYPES.map((t) => (
-                    <option key={t.code} value={t.code}>
-                      {t.label}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor={`upDate-${operateurId}`}>Date d'expiration</Label>
-                <Input
-                  id={`upDate-${operateurId}`}
-                  type="date"
-                  value={upDateExpiration}
-                  onChange={(e) => setUpDateExpiration(e.target.value)}
-                  disabled={upLoading}
-                />
-              </div>
-            </div>
-          )}
-          {!archived && (
-            <div className="flex items-center gap-2">
-              <Input
-                type="file"
-                accept=".pdf,.png,.jpg,.jpeg"
-                onChange={(e) => setUpFile(e.target.files?.[0] || null)}
-                disabled={upLoading}
-              />
-              <Button type="button" onClick={handleUpload} disabled={upLoading || !upFile}>
-                {upLoading ? 'Upload...' : 'Uploader'}
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
 
 export default function SuppliersPage() {
+  const router = useRouter()
   const [operateurs, setOperateurs] = useState<OperateurEconomique[]>([])
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [statutFilter, setStatutFilter] = useState<string>('all')
-  const [wilayaFilter, setWilayaFilter] = useState<string>('all')
   const [secteurFilter, setSecteurFilter] = useState<string>('all')
   const [showFilters, setShowFilters] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -467,6 +451,8 @@ export default function SuppliersPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState<OperateurEditForm | null>(null)
   const [savingId, setSavingId] = useState<number | null>(null)
+  const [blacklistOperateurId, setBlacklistOperateurId] = useState<number | null>(null)
+  const [blacklistForm, setBlacklistForm] = useState({ motif: '', dateDebut: '', dateFin: '' })
 
   useEffect(() => {
     apiClient.getSecteurs().then(setSecteurs).catch(() => setSecteurs([]))
@@ -493,7 +479,6 @@ export default function SuppliersPage() {
 
   const filteredOperateurs = operateurs.filter((op) => {
     if (statutFilter !== 'all' && op.statutLibelle !== statutFilter) return false
-    if (wilayaFilter !== 'all' && op.wilaya !== wilayaFilter) return false
     if (secteurFilter !== 'all' && op.secteurActiviteLibelle !== secteurFilter) return false
     return true
   })
@@ -517,16 +502,14 @@ export default function SuppliersPage() {
     setEditForm({
       raisonSociale: operateur.raisonSociale,
       nif: operateur.nif || '',
-      nis: operateur.nis || '',
-      registreCommerce: operateur.registreCommerce || '',
       secteurActiviteId: operateur.secteurActiviteId
         ? String(operateur.secteurActiviteId)
         : '',
+      typeFournisseur: operateur.typeFournisseur || '',
+      gerant: operateur.gerant || '',
       adresse: operateur.adresse || '',
-      wilaya: operateur.wilaya || '',
       telephone: operateur.telephone || '',
       email: operateur.email || '',
-      typeOperateur: operateur.typeOperateur || '',
       formeJuridique: operateur.formeJuridique || '',
       dateCreationEntreprise: toDateInputValue(operateur.dateCreationEntreprise),
       statutId: operateur.statutId ? String(operateur.statutId) : '',
@@ -559,16 +542,14 @@ export default function SuppliersPage() {
       setSavingId(operateur.id)
       const payload: UpdateOperateurRequest = {
         raisonSociale: editForm.raisonSociale,
-        typeOperateur: editForm.typeOperateur || undefined,
+        typeFournisseur: editForm.typeFournisseur || undefined,
+        gerant: editForm.gerant || undefined,
         formeJuridique: editForm.formeJuridique || undefined,
         nif: editForm.nif || undefined,
-        nis: editForm.nis || undefined,
-        registreCommerce: editForm.registreCommerce || undefined,
         secteurActiviteId: editForm.secteurActiviteId
           ? Number(editForm.secteurActiviteId)
           : null,
         adresse: editForm.adresse || undefined,
-        wilaya: editForm.wilaya || undefined,
         telephone: editForm.telephone || undefined,
         email: editForm.email || undefined,
         dateCreationEntreprise: editForm.dateCreationEntreprise || undefined,
@@ -627,14 +608,12 @@ export default function SuppliersPage() {
       setSavingId(op.id)
       const payload: UpdateOperateurRequest = {
         raisonSociale: op.raisonSociale,
-        typeOperateur: op.typeOperateur,
+        typeFournisseur: op.typeFournisseur,
+        gerant: op.gerant,
         formeJuridique: op.formeJuridique,
         nif: op.nif,
-        nis: op.nis,
-        registreCommerce: op.registreCommerce,
         secteurActiviteId: op.secteurActiviteId ?? null,
         adresse: op.adresse,
-        wilaya: op.wilaya,
         telephone: op.telephone,
         email: op.email,
         dateCreationEntreprise: op.dateCreationEntreprise,
@@ -645,6 +624,54 @@ export default function SuppliersPage() {
       loadOperateurs()
     } catch (err) {
       setError("Erreur lors du changement de statut")
+      console.error(err)
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  const handleArchive = async (op: OperateurEconomique) => {
+    if (!confirm(`Archiver "${op.raisonSociale}" ?`)) return
+    try {
+      setSavingId(op.id)
+      await apiClient.archiveOperateur(op.id, true)
+      loadOperateurs()
+    } catch (err) {
+      setError("Erreur lors de l'archivage")
+      console.error(err)
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  const handleBlacklistSubmit = async () => {
+    if (!blacklistOperateurId || !blacklistForm.motif || !blacklistForm.dateDebut) return
+    try {
+      setSavingId(blacklistOperateurId)
+      await apiClient.blacklistOperateur(blacklistOperateurId, {
+        motif: blacklistForm.motif,
+        dateDebut: blacklistForm.dateDebut,
+        dateFin: blacklistForm.dateFin || undefined,
+      })
+      setBlacklistOperateurId(null)
+      setBlacklistForm({ motif: '', dateDebut: '', dateFin: '' })
+      loadOperateurs()
+    } catch (err) {
+      setError("Erreur lors du blacklistage")
+      console.error(err)
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  const handleReactivate = async (op: OperateurEconomique) => {
+    if (!confirm(`Réactiver "${op.raisonSociale}" ?`)) return
+    try {
+      setSavingId(op.id)
+      await apiClient.reactivateOperateur(op.id)
+      loadOperateurs()
+    } catch (err) {
+      setError("Erreur lors de la réactivation")
       console.error(err)
     } finally {
       setSavingId(null)
@@ -709,37 +736,23 @@ export default function SuppliersPage() {
                 </option>
               ))}
             </select>
-            <select
-              value={wilayaFilter}
-              onChange={(e) => setWilayaFilter(e.target.value)}
-              className="px-3 py-2 rounded-md border border-input bg-background text-sm"
-            >
-              <option value="all">Toutes les wilayas</option>
-              {Array.from(
-                new Set(operateurs.map((o) => o.wilaya).filter(Boolean) as string[])
-              ).sort().map((w) => (
-                <option key={w} value={w}>
-                  {w}
-                </option>
-              ))}
+                <select
+                  value={secteurFilter}
+                  onChange={(e) => setSecteurFilter(e.target.value)}
+                  className="px-3 py-2 rounded-md border border-input bg-background text-sm"
+                >
+                  <option value="all">Tous les secteurs</option>
+                {Array.from(
+                  new Set(operateurs.map((o) => o.secteurActiviteLibelle).filter(Boolean) as string[])
+                ).sort().map((s) => (
+                  <option key={s} value={s}>
+                    {operateurs.find((o) => o.secteurActiviteLibelle === s)?.secteurActiviteCode ? `${operateurs.find((o) => o.secteurActiviteLibelle === s)?.secteurActiviteCode} - ` : ''}{s}
+                  </option>
+                ))}
             </select>
-            <select
-              value={secteurFilter}
-              onChange={(e) => setSecteurFilter(e.target.value)}
-              className="px-3 py-2 rounded-md border border-input bg-background text-sm"
-            >
-              <option value="all">Tous les secteurs</option>
-              {Array.from(
-                new Set(operateurs.map((o) => o.secteurActiviteLibelle).filter(Boolean) as string[])
-              ).sort().map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-            {(statutFilter !== 'all' || wilayaFilter !== 'all' || secteurFilter !== 'all') && (
-              <button
-                onClick={() => { setStatutFilter('all'); setWilayaFilter('all'); setSecteurFilter('all') }}
+                {(statutFilter !== 'all' || secteurFilter !== 'all') && (
+                  <button
+                    onClick={() => { setStatutFilter('all'); setSecteurFilter('all') }}
                 className="px-3 py-2 rounded-md border border-input bg-background text-sm text-muted-foreground hover:text-foreground"
               >
                 Réinitialiser
@@ -755,41 +768,82 @@ export default function SuppliersPage() {
           <div className="border rounded-lg divide-y">
             {filteredOperateurs.map((op) => {
               const isExpanded = expandedId === op.id
+              const rowBg =
+                op.statutLibelle === 'blacklisté'
+                  ? 'bg-red-50/60'
+                  :                 op.statutLibelle === 'archivé'
+                  ? 'bg-gray-100'
+                  : ''
               return (
                 <div
                   key={op.id}
-                  className={`transition-colors ${isExpanded ? 'bg-white' : ''}`}
+                  className={`transition-colors ${isExpanded ? (rowBg || 'bg-white') : rowBg}`}
                 >
                     <div
                       className="flex items-center gap-3 px-4 py-3 cursor-pointer"
-                      onClick={() => setExpandedId(isExpanded ? null : op.id)}
+                      onClick={() => router.push(`/suppliers/${op.id}`)}
                     >
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setExpandedId(isExpanded ? null : op.id) }}
+                        className="p-1 hover:bg-muted rounded transition-colors"
+                        title={isExpanded ? 'Réduire' : 'Développer'}
+                      >
+                        <ChevronDown size={16} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </button>
                       <span className="text-sm text-muted-foreground shrink-0">
                         {op.numeroImmatriculation}
                       </span>
                       <span className="font-medium flex-1 truncate">{op.raisonSociale}</span>
-                      {op.isArchived && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 shrink-0">
-                          <Lock size={12} /> Verrouillé
-                        </span>
-                      )}
+                      <StatutBadge statut={op.statutLibelle} />
                       <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <Select
-                          value={op.statutId ? String(op.statutId) : ''}
-                          onChange={(e) =>
-                            handleStatusChange(op, e.target.value ? Number(e.target.value) : null)
-                          }
-                          disabled={savingId === op.id}
-                          className="h-9 w-auto min-w-[8rem]"
-                          title="Changer le statut"
-                        >
-                          <option value="">-- Statut --</option>
-                          {statuts.filter((s) => STATUTS_FOURNISSEUR.includes(s.libelle)).map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.libelle}
-                            </option>
-                          ))}
-                        </Select>
+                        {op.statutLibelle === 'actif' && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setBlacklistOperateurId(op.id)
+                                setBlacklistForm({ motif: '', dateDebut: '', dateFin: '' })
+                              }}
+                              className="p-1.5 hover:bg-red-50 rounded"
+                              title="Blacklister"
+                            >
+                              <Ban size={16} className="text-red-600" />
+                            </button>
+                            <button
+                              onClick={() => handleArchive(op)}
+                              className="p-1.5 hover:bg-muted rounded"
+                              title="Archiver"
+                            >
+                              <Archive size={16} className="text-gray-600" />
+                            </button>
+                          </>
+                        )}
+                        {op.statutLibelle === 'blacklisté' && (
+                          <>
+                            <button
+                              onClick={() => handleReactivate(op)}
+                              className="p-1.5 hover:bg-green-50 rounded"
+                              title="Réactiver"
+                            >
+                              <RefreshCw size={16} className="text-[#2db34b]" />
+                            </button>
+                            <button
+                              onClick={() => handleArchive(op)}
+                              className="p-1.5 hover:bg-muted rounded"
+                              title="Archiver"
+                            >
+                              <Archive size={16} className="text-gray-600" />
+                            </button>
+                          </>
+                        )}
+                        {op.statutLibelle === 'archivé' && (
+                          <button
+                            onClick={() => handleReactivate(op)}
+                            className="p-1.5 hover:bg-green-50 rounded"
+                            title="Réactiver"
+                          >
+                            <RefreshCw size={16} className="text-[#2db34b]" />
+                          </button>
+                        )}
                         <button
                           onClick={() =>
                             editingId === op.id
@@ -820,7 +874,7 @@ export default function SuppliersPage() {
                               <div className="grid grid-cols-1 gap-3 text-sm">
                                 <div className="flex gap-2 items-center">
                                   <dt className="w-44 text-muted-foreground flex items-center gap-1.5 shrink-0">
-                                    <Hash size={14} /> N° Immatriculation
+                                    <Hash size={14} /> Code
                                   </dt>
                                   <dd className="font-medium">{op.numeroImmatriculation}</dd>
                                 </div>
@@ -845,26 +899,6 @@ export default function SuppliersPage() {
                                   />
                                 </div>
                                 <div className="flex gap-2 items-center">
-                                  <dt className="w-44 text-muted-foreground shrink-0">NIS</dt>
-                                  <Input
-                                    name="nis"
-                                    value={editForm.nis}
-                                    onChange={handleEditChange}
-                                    disabled={savingId === op.id}
-                                  />
-                                </div>
-                                <div className="flex gap-2 items-center">
-                                  <dt className="w-44 text-muted-foreground shrink-0">
-                                    Registre de commerce
-                                  </dt>
-                                  <Input
-                                    name="registreCommerce"
-                                    value={editForm.registreCommerce}
-                                    onChange={handleEditChange}
-                                    disabled={savingId === op.id}
-                                  />
-                                </div>
-                                <div className="flex gap-2 items-center">
                                   <dt className="w-44 text-muted-foreground shrink-0">
                                     Secteur d'activité
                                   </dt>
@@ -883,10 +917,28 @@ export default function SuppliersPage() {
                                   </Select>
                                 </div>
                                 <div className="flex gap-2 items-center">
-                                  <dt className="w-44 text-muted-foreground shrink-0">Type</dt>
+                                  <dt className="w-44 text-muted-foreground shrink-0">
+                                    Type fournisseur
+                                  </dt>
+                                  <Select
+                                    name="typeFournisseur"
+                                    value={editForm.typeFournisseur}
+                                    onChange={handleEditChange}
+                                    disabled={savingId === op.id}
+                                  >
+                                    <option value="">-- Sélectionner --</option>
+                                    <option value="Local">Local</option>
+                                    <option value="International">International</option>
+                                    <option value="Sous-traitant">Sous-traitant</option>
+                                  </Select>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <dt className="w-44 text-muted-foreground shrink-0">
+                                    Gérant
+                                  </dt>
                                   <Input
-                                    name="typeOperateur"
-                                    value={editForm.typeOperateur}
+                                    name="gerant"
+                                    value={editForm.gerant}
                                     onChange={handleEditChange}
                                     disabled={savingId === op.id}
                                   />
@@ -922,19 +974,7 @@ export default function SuppliersPage() {
                                 </div>
                                 <div className="flex gap-2 items-center">
                                   <dt className="w-44 text-muted-foreground shrink-0">Statut</dt>
-                                  <Select
-                                    name="statutId"
-                                    value={editForm.statutId}
-                                    onChange={handleEditChange}
-                                    disabled={savingId === op.id}
-                                  >
-                                    <option value="">-- Sélectionner --</option>
-                                    {statuts.filter((s) => STATUTS_FOURNISSEUR.includes(s.libelle)).map((s) => (
-                                      <option key={s.id} value={s.id}>
-                                        {s.libelle}
-                                      </option>
-                                    ))}
-                                  </Select>
+                                  <StatutBadge statut={op.statutLibelle} />
                                 </div>
                                 <div className="flex gap-2 items-center">
                                   <dt className="w-44 text-muted-foreground flex items-center gap-1.5 shrink-0">
@@ -943,15 +983,6 @@ export default function SuppliersPage() {
                                   <Input
                                     name="adresse"
                                     value={editForm.adresse}
-                                    onChange={handleEditChange}
-                                    disabled={savingId === op.id}
-                                  />
-                                </div>
-                                <div className="flex gap-2 items-center">
-                                  <dt className="w-44 text-muted-foreground shrink-0">Wilaya</dt>
-                                  <Input
-                                    name="wilaya"
-                                    value={editForm.wilaya}
                                     onChange={handleEditChange}
                                     disabled={savingId === op.id}
                                   />
@@ -1017,7 +1048,7 @@ export default function SuppliersPage() {
                               <dl className="grid grid-cols-1 gap-2 text-sm">
                                 <div className="flex gap-2">
                                   <dt className="w-44 text-muted-foreground flex items-center gap-1.5">
-                                    <Hash size={14} /> N° Immatriculation
+                                    <Hash size={14} /> Code
                                   </dt>
                                   <dd className="font-medium">{op.numeroImmatriculation || '—'}</dd>
                                 </div>
@@ -1030,16 +1061,8 @@ export default function SuppliersPage() {
                                   <dd className="font-medium">{op.nif || '—'}</dd>
                                 </div>
                                 <div className="flex gap-2">
-                                  <dt className="w-44 text-muted-foreground">NIS</dt>
-                                  <dd className="font-medium">{op.nis || '—'}</dd>
-                                </div>
-                                <div className="flex gap-2">
-                                  <dt className="w-44 text-muted-foreground">Registre de commerce</dt>
-                                  <dd className="font-medium">{op.registreCommerce || '—'}</dd>
-                                </div>
-                                <div className="flex gap-2">
                                   <dt className="w-44 text-muted-foreground">Secteur d'activité</dt>
-                                  <dd className="font-medium">{op.secteurActiviteLibelle || '—'}</dd>
+                                  <dd className="font-medium">{op.secteurActiviteCode ? `${op.secteurActiviteCode} - ` : ''}{op.secteurActiviteLibelle || '—'}</dd>
                                 </div>
                                 <div className="flex gap-2">
                                   <dt className="w-44 text-muted-foreground">Date d'immatriculation</dt>
@@ -1051,17 +1074,13 @@ export default function SuppliersPage() {
                                 </div>
                                 <div className="flex gap-2">
                                   <dt className="w-44 text-muted-foreground">Statut</dt>
-                                  <dd className="font-medium">{op.statutLibelle || '—'}</dd>
+                                  <dd><StatutBadge statut={op.statutLibelle} /></dd>
                                 </div>
                                 <div className="flex gap-2">
                                   <dt className="w-44 text-muted-foreground flex items-center gap-1.5">
                                     <MapPin size={14} /> Adresse
                                   </dt>
                                   <dd className="font-medium">{op.adresse || '—'}</dd>
-                                </div>
-                                <div className="flex gap-2">
-                                  <dt className="w-44 text-muted-foreground">Wilaya</dt>
-                                  <dd className="font-medium">{op.wilaya || '—'}</dd>
                                 </div>
                                 <div className="flex gap-2">
                                   <dt className="w-44 text-muted-foreground flex items-center gap-1.5">
@@ -1076,8 +1095,12 @@ export default function SuppliersPage() {
                                   <dd className="font-medium">{op.email || '—'}</dd>
                                 </div>
                                 <div className="flex gap-2">
-                                  <dt className="w-44 text-muted-foreground">Type</dt>
-                                  <dd className="font-medium capitalize">{op.typeOperateur || '—'}</dd>
+                                  <dt className="w-44 text-muted-foreground">Type fournisseur</dt>
+                                  <dd className="font-medium">{op.typeFournisseur || '—'}</dd>
+                                </div>
+                                <div className="flex gap-2">
+                                  <dt className="w-44 text-muted-foreground">Gérant</dt>
+                                  <dd className="font-medium">{op.gerant || '—'}</dd>
                                 </div>
                                 <div className="flex gap-2">
                                   <dt className="w-44 text-muted-foreground">Forme juridique</dt>
@@ -1132,6 +1155,63 @@ export default function SuppliersPage() {
         operateur={selectedOperateur}
         isLoading={isSubmitting}
       />
+
+      <Dialog open={blacklistOperateurId !== null} onOpenChange={(open) => { if (!open) { setBlacklistOperateurId(null); setBlacklistForm({ motif: '', dateDebut: '', dateFin: '' }) } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Blacklister le fournisseur</DialogTitle>
+            <DialogDescription>
+              Spécifiez le motif et la période de blacklistage.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <Label htmlFor="blacklist-motif">Motif *</Label>
+              <Input
+                id="blacklist-motif"
+                value={blacklistForm.motif}
+                onChange={(e) => setBlacklistForm((f) => ({ ...f, motif: e.target.value }))}
+                placeholder="Raison du blacklistage"
+              />
+            </div>
+            <div className="flex gap-4">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="blacklist-date-debut">Date de début *</Label>
+                <Input
+                  id="blacklist-date-debut"
+                  type="date"
+                  value={blacklistForm.dateDebut}
+                  onChange={(e) => setBlacklistForm((f) => ({ ...f, dateDebut: e.target.value }))}
+                />
+              </div>
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="blacklist-date-fin">Date de fin</Label>
+                <Input
+                  id="blacklist-date-fin"
+                  type="date"
+                  value={blacklistForm.dateFin}
+                  onChange={(e) => setBlacklistForm((f) => ({ ...f, dateFin: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => { setBlacklistOperateurId(null); setBlacklistForm({ motif: '', dateDebut: '', dateFin: '' }) }}
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={handleBlacklistSubmit}
+                disabled={!blacklistForm.motif || !blacklistForm.dateDebut || savingId === blacklistOperateurId}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {savingId === blacklistOperateurId ? 'Blacklistage...' : 'Confirmer'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

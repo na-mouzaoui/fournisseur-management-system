@@ -16,6 +16,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<Document> Documents { get; set; }
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<BlacklistEntry> BlacklistEntries { get; set; }
+    public DbSet<Evaluation> Evaluations { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,6 +32,8 @@ public class ApplicationDbContext : DbContext
         ConfigureDocument(modelBuilder);
         ConfigureNotification(modelBuilder);
         ConfigureAuditLog(modelBuilder);
+        ConfigureBlacklistEntry(modelBuilder);
+        ConfigureEvaluation(modelBuilder);
     }
 
     private static void ConfigureRole(ModelBuilder modelBuilder)
@@ -49,6 +53,7 @@ public class ApplicationDbContext : DbContext
         {
             e.ToTable("secteur_activite");
             e.Property(s => s.Id).HasColumnName("id");
+            e.Property(s => s.Code).HasColumnName("code").IsRequired().HasMaxLength(20);
             e.Property(s => s.Libelle).HasColumnName("libelle").IsRequired();
         });
     }
@@ -97,6 +102,8 @@ public class ApplicationDbContext : DbContext
             e.Property(o => o.NumeroImmatriculation).HasColumnName("numero_immatriculation").IsRequired();
             e.Property(o => o.RaisonSociale).HasColumnName("raison_sociale").IsRequired();
             e.Property(o => o.TypeOperateur).HasColumnName("type_operateur");
+            e.Property(o => o.TypeFournisseur).HasColumnName("type_fournisseur");
+            e.Property(o => o.Gerant).HasColumnName("gerant");
             e.Property(o => o.FormeJuridique).HasColumnName("forme_juridique");
             e.Property(o => o.Nif).HasColumnName("nif");
             e.Property(o => o.Nis).HasColumnName("nis");
@@ -185,7 +192,7 @@ public class ApplicationDbContext : DbContext
             e.HasIndex(d => new { d.DossierId, d.TypeCode }).IsUnique();
             e.HasAlternateKey(d => d.RowGuid);
             e.ToTable(t => t.HasCheckConstraint("CK_document_type_code",
-                "type_code IN ('REGISTRE_COMMERCE', 'STATUTS_SOCIETE', 'ATTESTATION_NIF', 'ATTESTATION_NIS', 'CASIER_JUDICIAIRE', 'PIECE_IDENTITE', 'EXTRAIT_ROLE')"));
+                "type_code IN ('VALIDITE_COTISATIONS_CNAS', 'CERTIFICAT_MISE_A_JOUR_FISCAL', 'CERTIFICAT_QUALIFICATION')"));
 
             e.HasOne(d => d.Dossier)
                 .WithMany(d => d.Documents)
@@ -239,6 +246,62 @@ public class ApplicationDbContext : DbContext
             e.Property(a => a.DateHeure).HasColumnName("date_heure").HasDefaultValueSql("GETDATE()");
 
             e.HasIndex(a => a.DateHeure);
+        });
+    }
+
+    private static void ConfigureBlacklistEntry(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<BlacklistEntry>(e =>
+        {
+            e.ToTable("blacklist_entry");
+            e.Property(b => b.Id).HasColumnName("id");
+            e.Property(b => b.OperateurId).HasColumnName("operateur_id").IsRequired();
+            e.Property(b => b.Motif).HasColumnName("motif").IsRequired().HasMaxLength(500);
+            e.Property(b => b.DateDebut).HasColumnName("date_debut").IsRequired();
+            e.Property(b => b.DateFin).HasColumnName("date_fin");
+            e.Property(b => b.CreatedBy).HasColumnName("created_by");
+            e.Property(b => b.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETDATE()");
+
+            e.HasOne(b => b.Operateur)
+                .WithMany()
+                .HasForeignKey(b => b.OperateurId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(b => b.Createur)
+                .WithMany()
+                .HasForeignKey(b => b.CreatedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureEvaluation(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Evaluation>(e =>
+        {
+            e.ToTable("evaluation");
+            e.Property(ev => ev.Id).HasColumnName("id");
+            e.Property(ev => ev.OperateurId).HasColumnName("operateur_id").IsRequired();
+            e.Property(ev => ev.NoteQualite).HasColumnName("note_qualite").IsRequired();
+            e.Property(ev => ev.NoteDelai).HasColumnName("note_delai").IsRequired();
+            e.Property(ev => ev.NotePrix).HasColumnName("note_prix").IsRequired();
+            e.Property(ev => ev.NoteService).HasColumnName("note_service").IsRequired();
+            e.Property(ev => ev.NoteGlobale).HasColumnName("note_globale").IsRequired();
+            e.Property(ev => ev.Commentaire).HasColumnName("commentaire").HasMaxLength(1000);
+            e.Property(ev => ev.EvaluateurId).HasColumnName("evaluateur_id");
+            e.Property(ev => ev.DateEvaluation).HasColumnName("date_evaluation").HasDefaultValueSql("GETDATE()");
+
+            e.ToTable(t => t.HasCheckConstraint("CK_evaluation_notes",
+                "note_qualite BETWEEN 1 AND 5 AND note_delai BETWEEN 1 AND 5 AND note_prix BETWEEN 1 AND 5 AND note_service BETWEEN 1 AND 5"));
+
+            e.HasOne(ev => ev.Operateur)
+                .WithMany()
+                .HasForeignKey(ev => ev.OperateurId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(ev => ev.Evaluateur)
+                .WithMany()
+                .HasForeignKey(ev => ev.EvaluateurId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }
