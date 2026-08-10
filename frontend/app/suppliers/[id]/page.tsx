@@ -42,43 +42,26 @@ function StatutBadge({ statut }: { statut?: string }) {
   )
 }
 
-function ScoreBadge({ note }: { note?: number | null }) {
-  if (note === undefined || note === null) return <span className="text-muted-foreground text-sm">—</span>
-  const color =
-    note >= 4 ? 'bg-[#2db34b] text-white' :
-    note >= 3 ? 'bg-yellow-100 text-yellow-800' :
-    'bg-red-100 text-red-800'
-  return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${color}`}>
-      <Star size={12} fill="currentColor" /> {note.toFixed(1)}
-    </span>
-  )
+const APPRECIATION_SCALE = [
+  { min: 24, label: 'Excellent', badge: 'bg-[#2db34b] text-white' },
+  { min: 16, label: 'Bon', badge: 'bg-[#2db34b]/15 text-[#2db34b]' },
+  { min: 12, label: 'Satisfaisant', badge: 'bg-yellow-100 text-yellow-800' },
+  { min: 8, label: 'Insatisfaisant', badge: 'bg-orange-100 text-orange-800' },
+  { min: 0, label: 'Mauvais', badge: 'bg-red-100 text-red-800' },
+] as const
+
+function getAppreciation(note?: number | null) {
+  if (note === undefined || note === null) return null
+  return APPRECIATION_SCALE.find((s) => note >= s.min) ?? null
 }
 
-function StarRating({ value, onChange, disabled }: { value: number; onChange: (v: number) => void; disabled?: boolean }) {
-  const [hover, setHover] = useState(0)
+function ScoreBadge({ note }: { note?: number | null }) {
+  const appreciation = getAppreciation(note)
+  if (note === undefined || note === null || !appreciation) return <span className="text-muted-foreground text-sm">—</span>
   return (
-    <div className="flex gap-0.5">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          disabled={disabled}
-          onClick={() => onChange(star)}
-          onMouseEnter={() => !disabled && setHover(star)}
-          onMouseLeave={() => setHover(0)}
-          className="disabled:cursor-not-allowed"
-        >
-          <Star
-            size={24}
-            className={`transition-colors ${
-              star <= (hover || value) ? 'text-yellow-400' : 'text-gray-300'
-            }`}
-            fill={star <= (hover || value) ? 'currentColor' : 'none'}
-          />
-        </button>
-      ))}
-    </div>
+    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${appreciation.badge}`}>
+      <Star size={12} fill="currentColor" /> {note.toFixed(1)}/24 · {appreciation.label}
+    </span>
   )
 }
 
@@ -96,12 +79,146 @@ function formatDateTime(dateString?: string) {
   return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-const AXES = [
-  { key: 'noteQualite', label: 'Qualité' },
-  { key: 'noteDelai', label: 'Délai' },
-  { key: 'notePrix', label: 'Prix' },
-  { key: 'noteService', label: 'Service' },
-] as const
+type EvaluationForm = {
+  noteConformite: number
+  noteDelai: number
+  notePrixConsultation: number
+  notePrixContrat: number
+  noteHse: number
+  noteService: number
+}
+
+const CRITERIA: {
+  key: keyof EvaluationForm
+  label: string
+  max: number
+  options: { value: number; label: string }[]
+}[] = [
+  {
+    key: 'noteConformite',
+    label: 'Conformité du Produit/Service Acheté',
+    max: 5,
+    options: [
+      { value: 0, label: 'Non-respect des exigences techniques ayant une incidence sur la qualité du produit et service' },
+      { value: 2, label: "Qualité acceptable ou non-respect partiel des Exigences Techniques, n'ayant pas une incidence sur la qualité du produit et service" },
+      { value: 4, label: 'Bonne qualité (conforme aux exigences)' },
+      { value: 5, label: 'Très bonne qualité (au-delà des exigences et attentes)' },
+    ],
+  },
+  {
+    key: 'noteDelai',
+    label: 'Délai de livraison',
+    max: 5,
+    options: [
+      { value: 0, label: 'Non-respect des délais' },
+      { value: 2, label: "Acceptable - non-respect des délais n'ayant pas une incidence sur les délais de réalisation" },
+      { value: 4, label: 'Respect des délais' },
+      { value: 5, label: 'Effort exceptionnel (délais réduits)' },
+    ],
+  },
+  {
+    key: 'notePrixConsultation',
+    label: 'Prix (Consultation)',
+    max: 4,
+    options: [
+      { value: 0, label: 'Prix excessif' },
+      { value: 2, label: 'Prix moyen' },
+      { value: 4, label: 'Prix moins disant' },
+    ],
+  },
+  {
+    key: 'notePrixContrat',
+    label: 'Prix (Contrat à commande)',
+    max: 4,
+    options: [
+      { value: 0, label: 'Prix révisé à la hausse' },
+      { value: 3, label: 'Prix maintenu' },
+      { value: 4, label: 'Effort commercial / Remise' },
+    ],
+  },
+  {
+    key: 'noteHse',
+    label: 'Respect des spécifications HSE',
+    max: 2,
+    options: [
+      { value: 0, label: "Non-respect des spécifications impactant la santé sécurité et/ou l'environnement" },
+      { value: 2, label: 'Respect des spécifications HSE' },
+    ],
+  },
+  {
+    key: 'noteService',
+    label: 'Le Service et la Relation Client',
+    max: 4,
+    options: [
+      { value: 0, label: 'Qualité de service médiocre' },
+      { value: 2, label: 'Qualité de service moyennement satisfaisante (nombre de requêtes ≥ 3)' },
+      { value: 3, label: 'Qualité de service satisfaisante (nombre de requêtes ≤ 2)' },
+      { value: 4, label: 'Qualité de service excellente (nombre de requêtes = 0)' },
+    ],
+  },
+]
+
+const EMPTY_EVAL_FORM: EvaluationForm = {
+  noteConformite: -1,
+  noteDelai: -1,
+  notePrixConsultation: -1,
+  notePrixContrat: -1,
+  noteHse: -1,
+  noteService: -1,
+}
+
+function CriterionPicker({
+  criterion,
+  value,
+  onChange,
+}: {
+  criterion: (typeof CRITERIA)[number]
+  value: number
+  onChange: (v: number) => void
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-sm font-semibold leading-snug">{criterion.label}</Label>
+        <span className="shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-muted-foreground">
+          {criterion.max} pts
+        </span>
+      </div>
+      <div className="space-y-2">
+        {criterion.options.map((opt) => {
+          const active = value === opt.value
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onChange(opt.value)}
+              aria-pressed={active}
+              className={`w-full flex items-start gap-3 rounded-lg border-2 px-3.5 py-2.5 text-left cursor-pointer transition-all ${
+                active
+                  ? 'border-primary bg-primary/5 shadow-sm'
+                  : 'border-border bg-card hover:border-muted-foreground/40 hover:bg-muted/30'
+              }`}
+            >
+              <span
+                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                  active ? 'border-primary bg-primary' : 'border-muted-foreground/40'
+                }`}
+              >
+                {active && <span className="h-2 w-2 rounded-full bg-white" />}
+              </span>
+              <span className="text-sm leading-snug">
+                <span className={`font-bold ${active ? 'text-primary' : ''}`}>
+                  {opt.value} pt{opt.value > 1 ? 's' : ''}
+                </span>
+                <span className="text-muted-foreground"> — {opt.label}</span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 export default function SupplierDetailPage() {
   const params = useParams()
@@ -117,7 +234,8 @@ export default function SupplierDetailPage() {
   const [error, setError] = useState('')
 
   const [showEvalModal, setShowEvalModal] = useState(false)
-  const [evalForm, setEvalForm] = useState({ noteQualite: 0, noteDelai: 0, notePrix: 0, noteService: 0, commentaire: '' })
+  const [evalForm, setEvalForm] = useState<EvaluationForm>(EMPTY_EVAL_FORM)
+  const [evalStep, setEvalStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [editingTab, setEditingTab] = useState<string | null>(null)
   const [editInfoForm, setEditInfoForm] = useState<Record<string, string>>({})
@@ -183,12 +301,18 @@ export default function SupplierDetailPage() {
   }
 
   const handleSubmitEvaluation = async () => {
-    if (!evalForm.noteQualite || !evalForm.noteDelai || !evalForm.notePrix || !evalForm.noteService) return
+    const incomplete = CRITERIA.some((c) => evalForm[c.key] < 0)
+    if (incomplete) return
     try {
       setSubmitting(true)
       await apiClient.createEvaluation({
         operateurId: id,
-        ...evalForm,
+        noteConformite: evalForm.noteConformite,
+        noteDelai: evalForm.noteDelai,
+        notePrixConsultation: evalForm.notePrixConsultation,
+        notePrixContrat: evalForm.notePrixContrat,
+        noteHse: evalForm.noteHse,
+        noteService: evalForm.noteService,
       })
       const [evals, st] = await Promise.all([
         apiClient.getEvaluationsByOperateur(id),
@@ -197,7 +321,8 @@ export default function SupplierDetailPage() {
       setEvaluations(evals)
       setStats(st)
       setShowEvalModal(false)
-      setEvalForm({ noteQualite: 0, noteDelai: 0, notePrix: 0, noteService: 0, commentaire: '' })
+      setEvalStep(0)
+      setEvalForm(EMPTY_EVAL_FORM)
     } catch (err) {
       setError("Erreur lors de l'enregistrement")
     } finally {
@@ -482,19 +607,52 @@ export default function SupplierDetailPage() {
               <div className="p-3 rounded-lg bg-gray-50">
                 <p className="text-2xl font-bold">
                   {stats?.noteGlobaleActuelle != null ? stats.noteGlobaleActuelle.toFixed(1) : '—'}
+                  {stats?.noteGlobaleActuelle != null ? '/24' : ''}
                 </p>
                 <p className="text-xs text-muted-foreground">Note moyenne</p>
+                {stats?.noteGlobaleActuelle != null && (
+                  <span
+                    className={`inline-block mt-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold ${getAppreciation(stats.noteGlobaleActuelle)?.badge}`}
+                  >
+                    {getAppreciation(stats.noteGlobaleActuelle)?.label}
+                  </span>
+                )}
               </div>
               <div className="p-3 rounded-lg bg-gray-50">
                 <p className="text-2xl font-bold">
                   {stats?.derniereNote != null ? stats.derniereNote.toFixed(1) : '—'}
+                  {stats?.derniereNote != null ? '/24' : ''}
                 </p>
                 <p className="text-xs text-muted-foreground">Dernière note</p>
+                {stats?.derniereNote != null && (
+                  <span
+                    className={`inline-block mt-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold ${getAppreciation(stats.derniereNote)?.badge}`}
+                  >
+                    {getAppreciation(stats.derniereNote)?.label}
+                  </span>
+                )}
               </div>
             </div>
-            <Button onClick={() => setShowEvalModal(true)}>
+            <Button onClick={() => { setEvalStep(0); setShowEvalModal(true) }}>
               <Star size={16} className="mr-1.5" /> Nouvelle évaluation
             </Button>
+          </div>
+
+          <div className="rounded-lg border p-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Échelle d'appréciation
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {APPRECIATION_SCALE.map((s, i) => (
+                <span
+                  key={s.label}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${s.badge}`}
+                >
+                  {s.label}
+                  {i === 0 ? ' : 24' : i === APPRECIATION_SCALE.length - 1 ? ' : < 8' : ` : ${s.min} - ${APPRECIATION_SCALE[i - 1].min - 1}`}
+                </span>
+              ))}
+            </div>
           </div>
 
           {evaluations.length === 0 ? (
@@ -516,17 +674,16 @@ export default function SupplierDetailPage() {
                       <span className="text-xs text-muted-foreground">Par {ev.evaluateurNom}</span>
                     )}
                   </div>
-                  <div className="grid grid-cols-4 gap-3 text-center text-xs">
-                    {AXES.map((axe) => (
-                      <div key={axe.key} className="p-2 rounded bg-gray-50">
-                        <p className="font-semibold text-sm">{ev[axe.key]}/5</p>
-                        <p className="text-muted-foreground">{axe.label}</p>
+                  <div className="grid grid-cols-3 gap-3 text-center text-xs">
+                    {CRITERIA.map((crit) => (
+                      <div key={crit.key} className="p-2 rounded bg-gray-50">
+                        <p className="font-semibold text-sm">
+                          {ev[crit.key]}/{crit.max}
+                        </p>
+                        <p className="text-muted-foreground">{crit.label}</p>
                       </div>
                     ))}
                   </div>
-                  {ev.commentaire && (
-                    <p className="text-sm text-muted-foreground italic">{ev.commentaire}</p>
-                  )}
                 </div>
               ))}
             </div>
@@ -565,38 +722,76 @@ export default function SupplierDetailPage() {
           <DialogHeader>
             <DialogTitle>Nouvelle évaluation</DialogTitle>
             <DialogDescription>
-              Évaluez {operateur.raisonSociale} sur les 4 axes (1 à 5 étoiles).
+              Évaluez {operateur.raisonSociale} sur les 6 critères ({' '}
+              {CRITERIA.reduce((s, c) => s + c.max, 0)} points au total).
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 mt-2">
-            {AXES.map((axe) => (
-              <div key={axe.key} className="flex items-center justify-between">
-                <Label className="w-20">{axe.label}</Label>
-                <StarRating
-                  value={evalForm[axe.key]}
-                  onChange={(v) => setEvalForm((f) => ({ ...f, [axe.key]: v }))}
+
+          <div className="flex items-center gap-1.5 mt-1">
+            {CRITERIA.map((crit, i) => {
+              const done = evalForm[crit.key] >= 0
+              const current = i === evalStep
+              return (
+                <button
+                  key={crit.key}
+                  type="button"
+                  onClick={() => setEvalStep(i)}
+                  title={`${i + 1}. ${crit.label}`}
+                  className={`h-2 flex-1 rounded-full transition-colors cursor-pointer ${
+                    done ? 'bg-[#2db34b]' : current ? 'bg-primary' : 'bg-muted'
+                  }`}
                 />
-              </div>
-            ))}
-            <div className="space-y-2">
-              <Label>Commentaire (optionnel)</Label>
-              <textarea
-                value={evalForm.commentaire}
-                onChange={(e) => setEvalForm((f) => ({ ...f, commentaire: e.target.value }))}
-                className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm min-h-[80px]"
-                placeholder="Remarques..."
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setShowEvalModal(false)}>
-                Annuler
-              </Button>
-              <Button
-                onClick={handleSubmitEvaluation}
-                disabled={!evalForm.noteQualite || !evalForm.noteDelai || !evalForm.notePrix || !evalForm.noteService || submitting}
-              >
-                {submitting ? 'Enregistrement...' : 'Enregistrer'}
-              </Button>
+              )
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1.5">
+            Critère {evalStep + 1} / {CRITERIA.length} — {CRITERIA[evalStep].label}
+          </p>
+
+          <div className="mt-3 space-y-4">
+            <CriterionPicker
+              criterion={CRITERIA[evalStep]}
+              value={evalForm[CRITERIA[evalStep].key]}
+              onChange={(v) => setEvalForm((f) => ({ ...f, [CRITERIA[evalStep].key]: v }))}
+            />
+
+            {evalStep === CRITERIA.length - 1 && (() => {
+              const total = CRITERIA.reduce((s, c) => s + (evalForm[c.key] >= 0 ? evalForm[c.key] : 0), 0)
+              const appr = getAppreciation(total)
+              return (
+                <div className="rounded-lg bg-gray-50 p-3 flex items-center justify-between">
+                  <span className="text-sm font-medium">Total</span>
+                  <span className="flex items-center gap-2">
+                    {appr && <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${appr.badge}`}>{appr.label}</span>}
+                    <span className="text-lg font-bold">{total} / 24</span>
+                  </span>
+                </div>
+              )
+            })()}
+
+            <div className="flex items-center justify-between gap-2 pt-2">
+              {evalStep > 0 ? (
+                <Button variant="outline" onClick={() => setEvalStep((s) => s - 1)}>
+                  Précédent
+                </Button>
+              ) : (
+                <span />
+              )}
+              {evalStep < CRITERIA.length - 1 ? (
+                <Button
+                  onClick={() => setEvalStep((s) => s + 1)}
+                  disabled={evalForm[CRITERIA[evalStep].key] < 0}
+                >
+                  Suivant
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSubmitEvaluation}
+                  disabled={CRITERIA.some((c) => evalForm[c.key] < 0) || submitting}
+                >
+                  {submitting ? 'Enregistrement...' : 'Enregistrer'}
+                </Button>
+              )}
             </div>
           </div>
         </DialogContent>

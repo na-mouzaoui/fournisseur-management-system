@@ -209,7 +209,7 @@ export default function DashboardPage() {
                       </td>
                       <td className="py-3 px-4 font-medium">{f.raisonSociale}</td>
                       <td className="py-3 px-4">{f.secteur || '—'}</td>
-                      <td className="py-3 px-4 font-semibold">{f.noteGlobale.toFixed(2)} / 5</td>
+                      <td className="py-3 px-4 font-semibold">{f.noteGlobale.toFixed(2)} / 24</td>
                       <td className="py-3 px-4">{f.nombreEvaluations}</td>
                       <td className="py-3 px-4">
                         <StatutBadge statut={f.statut} />

@@ -27,9 +27,11 @@ public class EvaluationService : IEvaluationService
                 Id = ev.Id,
                 OperateurId = ev.OperateurId,
                 OperateurRaisonSociale = ev.Operateur.RaisonSociale,
-                NoteQualite = ev.NoteQualite,
+                NoteConformite = ev.NoteConformite,
                 NoteDelai = ev.NoteDelai,
-                NotePrix = ev.NotePrix,
+                NotePrixConsultation = ev.NotePrixConsultation,
+                NotePrixContrat = ev.NotePrixContrat,
+                NoteHse = ev.NoteHse,
                 NoteService = ev.NoteService,
                 NoteGlobale = ev.NoteGlobale,
                 Commentaire = ev.Commentaire,
@@ -61,14 +63,16 @@ public class EvaluationService : IEvaluationService
 
     public async Task<EvaluationDto> CreateAsync(CreateEvaluationRequest request, int evaluateurId)
     {
-        var noteGlobale = (request.NoteQualite + request.NoteDelai + request.NotePrix + request.NoteService) / 4.0;
+        var noteGlobale = request.NoteConformite + request.NoteDelai + request.NotePrixConsultation + request.NotePrixContrat + request.NoteHse + request.NoteService;
 
         var evaluation = new Evaluation
         {
             OperateurId = request.OperateurId,
-            NoteQualite = request.NoteQualite,
+            NoteConformite = request.NoteConformite,
             NoteDelai = request.NoteDelai,
-            NotePrix = request.NotePrix,
+            NotePrixConsultation = request.NotePrixConsultation,
+            NotePrixContrat = request.NotePrixContrat,
+            NoteHse = request.NoteHse,
             NoteService = request.NoteService,
             NoteGlobale = noteGlobale,
             Commentaire = request.Commentaire,
@@ -86,9 +90,11 @@ public class EvaluationService : IEvaluationService
             Id = evaluation.Id,
             OperateurId = evaluation.OperateurId,
             OperateurRaisonSociale = operateur?.RaisonSociale,
-            NoteQualite = evaluation.NoteQualite,
+            NoteConformite = evaluation.NoteConformite,
             NoteDelai = evaluation.NoteDelai,
-            NotePrix = evaluation.NotePrix,
+            NotePrixConsultation = evaluation.NotePrixConsultation,
+            NotePrixContrat = evaluation.NotePrixContrat,
+            NoteHse = evaluation.NoteHse,
             NoteService = evaluation.NoteService,
             NoteGlobale = evaluation.NoteGlobale,
             Commentaire = evaluation.Commentaire,

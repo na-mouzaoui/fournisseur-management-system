@@ -212,9 +212,11 @@ export interface Evaluation {
   id: number
   operateurId: number
   operateurRaisonSociale?: string
-  noteQualite: number
+  noteConformite: number
   noteDelai: number
-  notePrix: number
+  notePrixConsultation: number
+  notePrixContrat: number
+  noteHse: number
   noteService: number
   noteGlobale: number
   commentaire?: string

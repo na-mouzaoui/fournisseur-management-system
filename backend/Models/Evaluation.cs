@@ -5,9 +5,11 @@ public class Evaluation
     public int Id { get; set; }
     public int OperateurId { get; set; }
     public OperateurEconomique Operateur { get; set; } = null!;
-    public int NoteQualite { get; set; }
+    public int NoteConformite { get; set; }
     public int NoteDelai { get; set; }
-    public int NotePrix { get; set; }
+    public int NotePrixConsultation { get; set; }
+    public int NotePrixContrat { get; set; }
+    public int NoteHse { get; set; }
     public int NoteService { get; set; }
     public double NoteGlobale { get; set; }
     public string? Commentaire { get; set; }

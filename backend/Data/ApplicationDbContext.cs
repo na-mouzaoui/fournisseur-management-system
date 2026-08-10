@@ -281,9 +281,11 @@ public class ApplicationDbContext : DbContext
             e.ToTable("evaluation");
             e.Property(ev => ev.Id).HasColumnName("id");
             e.Property(ev => ev.OperateurId).HasColumnName("operateur_id").IsRequired();
-            e.Property(ev => ev.NoteQualite).HasColumnName("note_qualite").IsRequired();
+            e.Property(ev => ev.NoteConformite).HasColumnName("note_conformite").IsRequired();
             e.Property(ev => ev.NoteDelai).HasColumnName("note_delai").IsRequired();
-            e.Property(ev => ev.NotePrix).HasColumnName("note_prix").IsRequired();
+            e.Property(ev => ev.NotePrixConsultation).HasColumnName("note_prix_consultation").IsRequired();
+            e.Property(ev => ev.NotePrixContrat).HasColumnName("note_prix_contrat").IsRequired();
+            e.Property(ev => ev.NoteHse).HasColumnName("note_hse").IsRequired();
             e.Property(ev => ev.NoteService).HasColumnName("note_service").IsRequired();
             e.Property(ev => ev.NoteGlobale).HasColumnName("note_globale").IsRequired();
             e.Property(ev => ev.Commentaire).HasColumnName("commentaire").HasMaxLength(1000);
@@ -291,7 +293,7 @@ public class ApplicationDbContext : DbContext
             e.Property(ev => ev.DateEvaluation).HasColumnName("date_evaluation").HasDefaultValueSql("GETDATE()");
 
             e.ToTable(t => t.HasCheckConstraint("CK_evaluation_notes",
-                "note_qualite BETWEEN 1 AND 5 AND note_delai BETWEEN 1 AND 5 AND note_prix BETWEEN 1 AND 5 AND note_service BETWEEN 1 AND 5"));
+                "note_conformite IN (0, 2, 4, 5) AND note_delai IN (0, 2, 4, 5) AND note_prix_consultation IN (0, 2, 4) AND note_prix_contrat IN (0, 3, 4) AND note_hse IN (0, 2) AND note_service IN (0, 2, 3, 4)"));
 
             e.HasOne(ev => ev.Operateur)
                 .WithMany()

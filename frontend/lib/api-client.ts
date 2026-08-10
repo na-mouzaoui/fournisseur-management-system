@@ -432,9 +432,11 @@ class ApiClient {
 
   async createEvaluation(data: {
     operateurId: number
-    noteQualite: number
+    noteConformite: number
     noteDelai: number
-    notePrix: number
+    notePrixConsultation: number
+    notePrixContrat: number
+    noteHse: number
     noteService: number
     commentaire?: string
   }): Promise<Evaluation> {
