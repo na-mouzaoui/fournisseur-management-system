@@ -8,10 +8,12 @@ namespace SupplierManagement.API.Services;
 public class OperateurService : IOperateurService
 {
     private readonly ApplicationDbContext _context;
+    private readonly INotificationService _notificationService;
 
-    public OperateurService(ApplicationDbContext context)
+    public OperateurService(ApplicationDbContext context, INotificationService notificationService)
     {
         _context = context;
+        _notificationService = notificationService;
     }
 
     public async Task<OperateurPagedResult> GetAllOperateursAsync(int page, int pageSize, string? search)
@@ -35,14 +37,25 @@ public class OperateurService : IOperateurService
         var items = await query
             .Include(o => o.SecteurActivite)
             .Include(o => o.Statut)
+            .Include(o => o.Dossiers)
+                .ThenInclude(d => d.Documents)
             .OrderByDescending(o => o.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
 
+        await _notificationService.NotifyExpiringDocumentsAsync();
+
+        var ids = items.Select(o => o.Id).ToList();
+        var blacklistEntries = await _context.BlacklistEntries
+            .AsNoTracking()
+            .Where(b => ids.Contains(b.OperateurId) && b.DateFin != null)
+            .OrderByDescending(b => b.CreatedAt)
+            .ToListAsync();
+
         return new OperateurPagedResult
         {
-            Data = items.Select(MapToDto).ToList(),
+            Data = items.Select(o => MapToDto(o, blacklistEntries.FirstOrDefault(b => b.OperateurId == o.Id))).ToList(),
             Total = total,
             Page = page,
             PageSize = pageSize
@@ -54,10 +67,21 @@ public class OperateurService : IOperateurService
         var operateur = await _context.OperateursEconomiques
             .Include(o => o.SecteurActivite)
             .Include(o => o.Statut)
+            .Include(o => o.Dossiers)
+                .ThenInclude(d => d.Documents)
             .AsNoTracking()
             .FirstOrDefaultAsync(o => o.Id == id);
 
-        return operateur != null ? MapToDto(operateur) : null;
+        if (operateur == null)
+            return null;
+
+        var blacklistEntry = await _context.BlacklistEntries
+            .AsNoTracking()
+            .Where(b => b.OperateurId == id && b.DateFin != null)
+            .OrderByDescending(b => b.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        return MapToDto(operateur, blacklistEntry);
     }
 
     public async Task<OperateurEconomiqueDto> CreateOperateurAsync(CreateOperateurRequest request, int createdBy)
@@ -190,6 +214,11 @@ public class OperateurService : IOperateurService
 
         await _context.SaveChangesAsync();
 
+        await _notificationService.CreateForAllUsersAsync(
+            "blacklistage",
+            $"Le fournisseur « {operateur.RaisonSociale} » a été blacklisté." +
+            (string.IsNullOrWhiteSpace(request.Motif) ? "" : $" Motif : {request.Motif}"));
+
         return new BlacklistEntryDto
         {
             Id = entry.Id,
@@ -218,12 +247,19 @@ public class OperateurService : IOperateurService
 
         await _context.SaveChangesAsync();
 
+        await _notificationService.CreateForAllUsersAsync(
+            "reactivation",
+            $"Le fournisseur « {operateur.RaisonSociale} » a été réactivé (dé-blacklisté).");
+
         return await GetOperateurByIdAsync(id) ?? MapToDto(operateur);
     }
 
     public static OperateurEconomiqueDto MapToDto(OperateurEconomique operateur)
+        => MapToDto(operateur, null);
+
+    public static OperateurEconomiqueDto MapToDto(OperateurEconomique operateur, BlacklistEntry? blacklistEntry)
     {
-        return new OperateurEconomiqueDto
+        var dto = new OperateurEconomiqueDto
         {
             Id = operateur.Id,
             NumeroImmatriculation = operateur.NumeroImmatriculation,
@@ -252,5 +288,24 @@ public class OperateurService : IOperateurService
             IsArchived = operateur.IsArchived,
             DateSuppression = operateur.DateSuppression
         };
+
+        var now = DateTime.UtcNow;
+        var limit = now.AddMonths(1);
+        var expirationsProches = operateur.Dossiers
+            .SelectMany(d => d.Documents)
+            .Where(d => d.DateExpiration.HasValue && d.DateExpiration.Value <= limit)
+            .Select(d => d.DateExpiration!.Value)
+            .ToList();
+
+        dto.HasDocumentExpiringSoon = expirationsProches.Count > 0;
+        dto.ProchainDocumentExpiration = expirationsProches.Count > 0 ? expirationsProches.Min() : null;
+
+        if (blacklistEntry != null && blacklistEntry.DateFin.HasValue)
+        {
+            dto.BlacklistDateFin = blacklistEntry.DateFin;
+            dto.BlacklistEndsSoon = blacklistEntry.DateFin.Value <= limit;
+        }
+
+        return dto;
     }
 }

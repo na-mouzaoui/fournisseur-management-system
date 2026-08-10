@@ -44,6 +44,8 @@ public interface INotificationService
 {
     Task<List<NotificationDto>> GetNotificationsAsync(int utilisateurId);
     Task MarkAsReadAsync(int id, int utilisateurId);
+    Task CreateForAllUsersAsync(string type, string message, int? dossierId = null);
+    Task NotifyExpiringDocumentsAsync();
 }
 
 public interface IReferentielService

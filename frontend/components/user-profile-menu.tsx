@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { User, Shield, LogOut, Bell } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
@@ -36,14 +36,22 @@ export default function UserProfileMenu() {
     return () => document.removeEventListener("mousedown", onClick)
   }, [])
 
+  const loadNotifications = useCallback(() => {
+    apiClient
+      .getNotifications()
+      .then((data) => setNotifications(data || []))
+      .catch(() => setNotifications([]))
+  }, [])
+
   useEffect(() => {
-    if (open) {
-      apiClient
-        .getNotifications()
-        .then((data) => setNotifications(data || []))
-        .catch(() => setNotifications([]))
-    }
-  }, [open])
+    loadNotifications()
+    const interval = setInterval(loadNotifications, 30000)
+    return () => clearInterval(interval)
+  }, [loadNotifications])
+
+  useEffect(() => {
+    if (open) loadNotifications()
+  }, [open, loadNotifications])
 
   if (!user) return null
 

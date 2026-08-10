@@ -41,6 +41,7 @@ import {
   Archive,
   RefreshCw,
   ChevronDown,
+  AlertTriangle,
 } from 'lucide-react'
 
 const PAGE_SIZE = 10
@@ -794,6 +795,30 @@ export default function SuppliersPage() {
                         {op.numeroImmatriculation}
                       </span>
                       <span className="font-medium flex-1 truncate">{op.raisonSociale}</span>
+                      {op.hasDocumentExpiringSoon && (
+                        <span
+                          className="shrink-0"
+                          title={
+                            op.prochainDocumentExpiration
+                              ? `Un document expire le ${formatDate(op.prochainDocumentExpiration)}`
+                              : 'Un document expire dans moins d\'un mois'
+                          }
+                        >
+                          <FileText className="h-4 w-4 text-orange-500" />
+                        </span>
+                      )}
+                      {op.blacklistEndsSoon && (
+                        <span
+                          className="shrink-0"
+                          title={
+                            op.blacklistDateFin
+                              ? `Fin de la période de blacklistage le ${formatDate(op.blacklistDateFin)}`
+                              : 'La période de blacklistage se termine dans moins d\'un mois'
+                          }
+                        >
+                          <AlertTriangle className="h-4 w-4 text-red-600" />
+                        </span>
+                      )}
                       <StatutBadge statut={op.statutLibelle} />
                       <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                         {op.statutLibelle === 'actif' && (

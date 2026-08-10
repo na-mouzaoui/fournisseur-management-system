@@ -76,6 +76,10 @@ export interface OperateurEconomique {
   updatedAt?: string
   isArchived?: boolean
   dateSuppression?: string
+  hasDocumentExpiringSoon?: boolean
+  prochainDocumentExpiration?: string
+  blacklistEndsSoon?: boolean
+  blacklistDateFin?: string
 }
 
 export interface CreateOperateurRequest {

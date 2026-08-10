@@ -28,6 +28,10 @@ public class OperateurEconomiqueDto
     public DateTime? UpdatedAt { get; set; }
     public bool IsArchived { get; set; }
     public DateTime? DateSuppression { get; set; }
+    public bool HasDocumentExpiringSoon { get; set; }
+    public DateTime? ProchainDocumentExpiration { get; set; }
+    public bool BlacklistEndsSoon { get; set; }
+    public DateTime? BlacklistDateFin { get; set; }
 }
 
 public class ArchiveOperateurRequest
