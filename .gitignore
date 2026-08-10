@@ -5,9 +5,12 @@ __v0_jsx-dev-runtime.ts
 .snowflake/
 .v0-trash/
 .vercel/
-.log
+
 # Environment variables
 .env*.local
+
+# Database folder (logs & local scripts)
+database/
 
 # Common ignores
 node_modules

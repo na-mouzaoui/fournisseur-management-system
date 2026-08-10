@@ -163,6 +163,11 @@ public class OperateurService : IOperateurService
         operateur.DateSuppression = DateTime.UtcNow;
         operateur.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
+
+        await _notificationService.CreateForAllUsersAsync(
+            "suppression",
+            $"Le fournisseur « {operateur.RaisonSociale} » a été supprimé.");
+
         return true;
     }
 
