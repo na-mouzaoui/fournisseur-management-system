@@ -9,6 +9,7 @@ public class DashboardStatsDto
     public int SupprimesMoisEnCours { get; set; }
     public List<SecteurRepartitionDto> RepartitionSecteurs { get; set; } = new();
     public List<DernierFournisseurDto> DerniersFournisseurs { get; set; } = new();
+    public List<TopFournisseurDto> TopFournisseurs { get; set; } = new();
 }
 
 public class SecteurRepartitionDto
@@ -24,4 +25,14 @@ public class DernierFournisseurDto
     public string? Secteur { get; set; }
     public string? Statut { get; set; }
     public DateTime DateCreation { get; set; }
+}
+
+public class TopFournisseurDto
+{
+    public int Id { get; set; }
+    public string RaisonSociale { get; set; } = string.Empty;
+    public string? Secteur { get; set; }
+    public string? Statut { get; set; }
+    public double NoteGlobale { get; set; }
+    public int NombreEvaluations { get; set; }
 }

@@ -6,7 +6,7 @@ namespace SupplierManagement.API.Services;
 
 public interface IDashboardService
 {
-    Task<DashboardStatsDto> GetStatsAsync();
+    Task<DashboardStatsDto> GetStatsAsync(int topCount = 5);
 }
 
 public class DashboardService : IDashboardService
@@ -18,9 +18,10 @@ public class DashboardService : IDashboardService
         _context = context;
     }
 
-    public async Task<DashboardStatsDto> GetStatsAsync()
+    public async Task<DashboardStatsDto> GetStatsAsync(int topCount = 5)
     {
         var maintenant = DateTime.UtcNow;
+        topCount = Math.Clamp(topCount, 1, 50);
 
         var actifs = await _context.OperateursEconomiques
             .AsNoTracking()
@@ -73,6 +74,47 @@ public class DashboardService : IDashboardService
             })
             .ToList();
 
+        // Top 5 des fournisseurs les mieux notés
+        var topNotes = await _context.Evaluations
+            .AsNoTracking()
+            .Where(e => e.Operateur.DateSuppression == null && !e.Operateur.IsArchived)
+            .GroupBy(e => e.OperateurId)
+            .Select(g => new
+            {
+                OperateurId = g.Key,
+                NoteMoyenne = g.Average(e => e.NoteGlobale),
+                NombreEvaluations = g.Count()
+            })
+            .OrderByDescending(x => x.NoteMoyenne)
+            .Take(topCount)
+            .ToListAsync();
+
+        var topIds = topNotes.Select(t => t.OperateurId).ToList();
+        var operateursTop = await _context.OperateursEconomiques
+            .AsNoTracking()
+            .Include(o => o.SecteurActivite)
+            .Include(o => o.Statut)
+            .Where(o => topIds.Contains(o.Id))
+            .ToListAsync();
+
+        var top = topNotes
+            .Select(t =>
+            {
+                var op = operateursTop.FirstOrDefault(o => o.Id == t.OperateurId);
+                if (op == null) return null;
+                return new TopFournisseurDto
+                {
+                    Id = op.Id,
+                    RaisonSociale = op.RaisonSociale,
+                    Secteur = op.SecteurActivite?.Libelle,
+                    Statut = op.Statut?.Libelle,
+                    NoteGlobale = Math.Round(t.NoteMoyenne, 2),
+                    NombreEvaluations = t.NombreEvaluations
+                };
+            })
+            .Where(x => x != null)
+            .ToList()!;
+
         return new DashboardStatsDto
         {
             TotalOperateurs = total,
@@ -81,7 +123,8 @@ public class DashboardService : IDashboardService
             NouveauxMoisEnCours = nouveauxMoisEnCours,
             SupprimesMoisEnCours = supprimesMoisEnCours,
             RepartitionSecteurs = secteurs,
-            DerniersFournisseurs = derniers
+            DerniersFournisseurs = derniers,
+            TopFournisseurs = top
         };
     }
 }

@@ -18,8 +18,8 @@ public class DashboardController : ControllerBase
     }
 
     [HttpGet("stats")]
-    public async Task<ActionResult<DashboardStatsDto>> GetStats()
+    public async Task<ActionResult<DashboardStatsDto>> GetStats([FromQuery] int top = 5)
     {
-        return Ok(await _dashboardService.GetStatsAsync());
+        return Ok(await _dashboardService.GetStatsAsync(top));
     }
 }

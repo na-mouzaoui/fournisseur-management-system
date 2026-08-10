@@ -251,6 +251,15 @@ export interface DernierFournisseur {
   dateCreation: string
 }
 
+export interface TopFournisseur {
+  id: number
+  raisonSociale: string
+  secteur?: string
+  statut?: string
+  noteGlobale: number
+  nombreEvaluations: number
+}
+
 export interface DashboardStats {
   totalOperateurs: number
   operateursBlacklistes: number
@@ -259,4 +268,5 @@ export interface DashboardStats {
   supprimesMoisEnCours: number
   repartitionSecteurs: SecteurRepartition[]
   derniersFournisseurs: DernierFournisseur[]
+  topFournisseurs: TopFournisseur[]
 }

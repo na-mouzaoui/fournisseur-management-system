@@ -324,8 +324,8 @@ class ApiClient {
   }
 
   // ===== Dashboard =====
-  async getDashboardStats(): Promise<DashboardStats> {
-    return this.fetch<DashboardStats>('/api/dashboard/stats', {
+  async getDashboardStats(top: number = 5): Promise<DashboardStats> {
+    return this.fetch<DashboardStats>(`/api/dashboard/stats?top=${top}`, {
       method: 'GET',
     })
   }

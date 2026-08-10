@@ -23,22 +23,25 @@ function StatutBadge({ statut }: { statut?: string }) {
   )
 }
 
+const TOP_CHOICES = [5, 10, 15, 20, 25]
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [error, setError] = useState('')
   const [selectedSector, setSelectedSector] = useState('')
+  const [topCount, setTopCount] = useState(5)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     apiClient
-      .getDashboardStats()
+      .getDashboardStats(topCount)
       .then((data) => {
         setStats(data)
         setSelectedSector(data.repartitionSecteurs[0]?.secteur ?? '')
       })
       .catch(() => setError("Impossible de charger les statistiques du tableau de bord"))
       .finally(() => setIsLoading(false))
-  }, [])
+  }, [topCount])
 
   if (isLoading) {
     return (
@@ -156,40 +159,60 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Derniers fournisseurs */}
+      {/* Top des fournisseurs les mieux notés */}
       <Card>
-        <CardHeader>
-          <CardTitle>Derniers fournisseurs ajoutés</CardTitle>
-          <CardDescription>
-            Les 5 opérateurs économiques les plus récents
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle>Top {topCount} des fournisseurs les mieux notés</CardTitle>
+            <CardDescription>
+              Classement par moyenne des évaluations
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Nombre :</span>
+            <Select
+              value={String(topCount)}
+              onChange={(e) => setTopCount(Number(e.target.value))}
+              className="h-8 text-xs min-w-[5rem]"
+            >
+              {TOP_CHOICES.map((c) => (
+                <option key={c} value={c}>
+                  Top {c}
+                </option>
+              ))}
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
-          {stats.derniersFournisseurs.length === 0 ? (
+          {(stats.topFournisseurs || []).length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              Aucun fournisseur disponible
+              Aucune évaluation disponible
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
+                    <th className="text-left py-3 px-4">#</th>
                     <th className="text-left py-3 px-4">Raison sociale</th>
                     <th className="text-left py-3 px-4">Secteur</th>
+                    <th className="text-left py-3 px-4">Note moyenne</th>
+                    <th className="text-left py-3 px-4">Évaluations</th>
                     <th className="text-left py-3 px-4">Statut</th>
-                    <th className="text-left py-3 px-4">Date d'ajout</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {stats.derniersFournisseurs.map((f) => (
+                  {(stats.topFournisseurs || []).map((f, index) => (
                     <tr key={f.id} className="border-b hover:bg-muted/50 transition-colors">
+                      <td className="py-3 px-4 font-bold" style={{ color: '#2db34b' }}>
+                        {index + 1}
+                      </td>
                       <td className="py-3 px-4 font-medium">{f.raisonSociale}</td>
                       <td className="py-3 px-4">{f.secteur || '—'}</td>
+                      <td className="py-3 px-4 font-semibold">{f.noteGlobale.toFixed(2)} / 5</td>
+                      <td className="py-3 px-4">{f.nombreEvaluations}</td>
                       <td className="py-3 px-4">
                         <StatutBadge statut={f.statut} />
-                      </td>
-                      <td className="py-3 px-4">
-                        {new Date(f.dateCreation).toLocaleDateString('fr-FR')}
                       </td>
                     </tr>
                   ))}
@@ -199,6 +222,7 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
     </div>
   )
 }
