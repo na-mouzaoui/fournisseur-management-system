@@ -21,6 +21,7 @@ public class EvaluationService : IEvaluationService
             .Where(ev => ev.OperateurId == operateurId)
             .Include(ev => ev.Operateur)
             .Include(ev => ev.Evaluateur)
+            .Include(ev => ev.Prestation)
             .OrderByDescending(ev => ev.DateEvaluation)
             .Select(ev => new EvaluationDto
             {
@@ -34,6 +35,9 @@ public class EvaluationService : IEvaluationService
                 NoteHse = ev.NoteHse,
                 NoteService = ev.NoteService,
                 NoteGlobale = ev.NoteGlobale,
+                Semestre = ev.Semestre,
+                PrestationId = ev.PrestationId,
+                PrestationReference = ev.Prestation != null ? ev.Prestation.Reference : null,
                 Commentaire = ev.Commentaire,
                 EvaluateurId = ev.EvaluateurId,
                 EvaluateurNom = ev.Evaluateur != null ? ev.Evaluateur.Nom : null,
@@ -63,6 +67,19 @@ public class EvaluationService : IEvaluationService
 
     public async Task<EvaluationDto> CreateAsync(CreateEvaluationRequest request, int evaluateurId)
     {
+        if (string.IsNullOrWhiteSpace(request.Semestre))
+            throw new InvalidOperationException("Le semestre de l'évaluation est obligatoire");
+        if (request.Semestre != "S1" && request.Semestre != "S2")
+            throw new InvalidOperationException("Le semestre doit être S1 (juin) ou S2 (décembre)");
+        if (request.PrestationId == null)
+            throw new InvalidOperationException("La prestation à évaluer est obligatoire");
+
+        var prestation = await _context.Prestations.FindAsync(request.PrestationId);
+        if (prestation == null)
+            throw new KeyNotFoundException("Prestation non trouvée");
+        if (prestation.OperateurId != request.OperateurId)
+            throw new InvalidOperationException("La prestation sélectionnée n'appartient pas à ce fournisseur");
+
         var noteGlobale = request.NoteConformite + request.NoteDelai + request.NotePrixConsultation + request.NotePrixContrat + request.NoteHse + request.NoteService;
 
         var evaluation = new Evaluation
@@ -75,6 +92,8 @@ public class EvaluationService : IEvaluationService
             NoteHse = request.NoteHse,
             NoteService = request.NoteService,
             NoteGlobale = noteGlobale,
+            Semestre = request.Semestre,
+            PrestationId = request.PrestationId,
             Commentaire = request.Commentaire,
             EvaluateurId = evaluateurId,
             DateEvaluation = DateTime.UtcNow
@@ -97,6 +116,9 @@ public class EvaluationService : IEvaluationService
             NoteHse = evaluation.NoteHse,
             NoteService = evaluation.NoteService,
             NoteGlobale = evaluation.NoteGlobale,
+            Semestre = evaluation.Semestre,
+            PrestationId = evaluation.PrestationId,
+            PrestationReference = prestation.Reference,
             Commentaire = evaluation.Commentaire,
             EvaluateurId = evaluation.EvaluateurId,
             DateEvaluation = evaluation.DateEvaluation

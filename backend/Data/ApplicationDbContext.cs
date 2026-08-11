@@ -18,6 +18,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<AuditLog> AuditLogs { get; set; }
     public DbSet<BlacklistEntry> BlacklistEntries { get; set; }
     public DbSet<Evaluation> Evaluations { get; set; }
+    public DbSet<Prestation> Prestations { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -34,6 +35,7 @@ public class ApplicationDbContext : DbContext
         ConfigureAuditLog(modelBuilder);
         ConfigureBlacklistEntry(modelBuilder);
         ConfigureEvaluation(modelBuilder);
+        ConfigurePrestation(modelBuilder);
     }
 
     private static void ConfigureRole(ModelBuilder modelBuilder)
@@ -288,9 +290,14 @@ public class ApplicationDbContext : DbContext
             e.Property(ev => ev.NoteHse).HasColumnName("note_hse").IsRequired();
             e.Property(ev => ev.NoteService).HasColumnName("note_service").IsRequired();
             e.Property(ev => ev.NoteGlobale).HasColumnName("note_globale").IsRequired();
+            e.Property(ev => ev.Annee).HasColumnName("annee");
+            e.Property(ev => ev.Semestre).HasColumnName("semestre").HasMaxLength(10);
+            e.Property(ev => ev.PrestationId).HasColumnName("prestation_id");
             e.Property(ev => ev.Commentaire).HasColumnName("commentaire").HasMaxLength(1000);
             e.Property(ev => ev.EvaluateurId).HasColumnName("evaluateur_id");
             e.Property(ev => ev.DateEvaluation).HasColumnName("date_evaluation").HasDefaultValueSql("GETDATE()");
+
+            e.HasIndex(ev => ev.PrestationId);
 
             e.ToTable(t => t.HasCheckConstraint("CK_evaluation_notes",
                 "note_conformite IN (0, 2, 4, 5) AND note_delai IN (0, 2, 4, 5) AND note_prix_consultation IN (0, 2, 4) AND note_prix_contrat IN (0, 3, 4) AND note_hse IN (0, 2) AND note_service IN (0, 2, 3, 4)"));
@@ -303,6 +310,42 @@ public class ApplicationDbContext : DbContext
             e.HasOne(ev => ev.Evaluateur)
                 .WithMany()
                 .HasForeignKey(ev => ev.EvaluateurId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(ev => ev.Prestation)
+                .WithMany()
+                .HasForeignKey(ev => ev.PrestationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigurePrestation(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Prestation>(e =>
+        {
+            e.ToTable("prestation");
+            e.Property(c => c.Id).HasColumnName("id");
+            e.Property(c => c.Reference).HasColumnName("reference").IsRequired().HasMaxLength(100);
+            e.Property(c => c.StructureContractante).HasColumnName("structure_contractante").IsRequired().HasMaxLength(200);
+            e.Property(c => c.Description).HasColumnName("description").HasMaxLength(1000);
+            e.Property(c => c.OperateurId).HasColumnName("operateur_id").IsRequired();
+            e.Property(c => c.DateDebut).HasColumnName("date_debut").IsRequired();
+            e.Property(c => c.DateFin).HasColumnName("date_fin");
+            e.Property(c => c.CreatedBy).HasColumnName("created_by");
+            e.Property(c => c.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETDATE()");
+            e.Property(c => c.UpdatedAt).HasColumnName("updated_at");
+
+            e.HasIndex(c => c.Reference);
+            e.HasIndex(c => c.OperateurId);
+
+            e.HasOne(c => c.Operateur)
+                .WithMany()
+                .HasForeignKey(c => c.OperateurId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(c => c.Createur)
+                .WithMany()
+                .HasForeignKey(c => c.CreatedBy)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

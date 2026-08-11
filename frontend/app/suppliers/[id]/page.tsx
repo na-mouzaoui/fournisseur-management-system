@@ -19,7 +19,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
-import { OperateurEconomique, Evaluation, EvaluationStats, SecteurActivite } from '@/lib/types'
+import { OperateurEconomique, Evaluation, EvaluationStats, SecteurActivite, Prestation } from '@/lib/types'
 import { OperateurDocuments } from '../page'
 import { Select } from '@/components/ui/select'
 import CommercialSection from './commercial'
@@ -196,6 +196,26 @@ const EMPTY_EVAL_FORM: EvaluationForm = {
   noteService: -1,
 }
 
+type EvalContext = {
+  prestationId: string
+  semestre: string
+}
+
+const EMPTY_EVAL_CONTEXT: EvalContext = {
+  prestationId: '',
+  semestre: '',
+}
+
+const SEMESTRES = [
+  { value: 'S1', label: 'S1 - Juin' },
+  { value: 'S2', label: 'S2 - Décembre' },
+]
+
+const semestreLabel = (s?: string) => {
+  if (!s) return ''
+  return SEMESTRES.find((x) => x.value === s)?.label || s
+}
+
 function CriterionPicker({
   criterion,
   value,
@@ -306,8 +326,10 @@ export default function SupplierDetailPage() {
 
   const [showEvalModal, setShowEvalModal] = useState(false)
   const [evalForm, setEvalForm] = useState<EvaluationForm>(EMPTY_EVAL_FORM)
+  const [evalContext, setEvalContext] = useState<EvalContext>(EMPTY_EVAL_CONTEXT)
   const [priceType, setPriceType] = useState<PriceMode>('consultation')
   const [evalStep, setEvalStep] = useState(0)
+  const [prestations, setPrestations] = useState<Prestation[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [editingTab, setEditingTab] = useState<string | null>(null)
   const [editInfoForm, setEditInfoForm] = useState<Record<string, string>>({})
@@ -336,6 +358,7 @@ export default function SupplierDetailPage() {
       setStats(st)
       setSecteurs(sect)
     }).catch(() => setError('Erreur lors du chargement')).finally(() => setIsLoading(false))
+    apiClient.getPrestations(1, 1000).then((r) => setPrestations(r.data || [])).catch(() => setPrestations([]))
   }, [id])
 
   const startEditInfo = () => {
@@ -382,8 +405,22 @@ export default function SupplierDetailPage() {
     }
   }
 
+  const evalContextComplete = !!evalContext.prestationId && !!evalContext.semestre
+
+  const TOTAL_STEPS = CRITERIA.length + 1
+
+  const isStepComplete = (step: number) => {
+    if (step === 0) return evalContextComplete
+    return isCriterionComplete(evalForm, CRITERIA[step - 1], priceType)
+  }
+
+  const stepLabel = (step: number) => {
+    if (step === 0) return "Contexte de l'évaluation"
+    return `Critère ${step} / ${CRITERIA.length} — ${CRITERIA[step - 1].label}`
+  }
+
   const handleSubmitEvaluation = async () => {
-    const incomplete = CRITERIA.some((c) => !isCriterionComplete(evalForm, c, priceType))
+    const incomplete = !evalContextComplete || CRITERIA.some((c) => !isCriterionComplete(evalForm, c, priceType))
     if (incomplete) return
     try {
       const prixKey = PRICE_MODES[priceType].key
@@ -397,6 +434,8 @@ export default function SupplierDetailPage() {
         notePrixContrat: prixKey === 'notePrixContrat' ? evalForm.notePrixContrat : 0,
         noteHse: evalForm.noteHse,
         noteService: evalForm.noteService,
+        semestre: evalContext.semestre,
+        prestationId: Number(evalContext.prestationId),
       })
       const [evals, st] = await Promise.all([
         apiClient.getEvaluationsByOperateur(id),
@@ -407,6 +446,7 @@ export default function SupplierDetailPage() {
       setShowEvalModal(false)
       setEvalStep(0)
       setEvalForm(EMPTY_EVAL_FORM)
+      setEvalContext(EMPTY_EVAL_CONTEXT)
       setPriceType('consultation')
     } catch (err) {
       setError("Erreur lors de l'enregistrement")
@@ -718,7 +758,7 @@ export default function SupplierDetailPage() {
                 )}
               </div>
             </div>
-            <Button onClick={() => { setEvalStep(0); setPriceType('consultation'); setShowEvalModal(true) }}>
+            <Button onClick={() => { setEvalStep(0); setPriceType('consultation'); setEvalContext(EMPTY_EVAL_CONTEXT); setShowEvalModal(true) }}>
               <Star size={16} className="mr-1.5" /> Nouvelle évaluation
             </Button>
           </div>
@@ -748,6 +788,16 @@ export default function SupplierDetailPage() {
                         <span className="text-sm text-muted-foreground flex items-center gap-1">
                           <Calendar size={14} /> {formatDateTime(ev.dateEvaluation)}
                         </span>
+                        {ev.semestre && (
+                          <span className="text-sm font-medium text-foreground">
+                            {semestreLabel(ev.semestre)}
+                          </span>
+                        )}
+                        {ev.prestationReference && (
+                          <span className="text-sm text-muted-foreground">
+                            · Prestation {ev.prestationReference}
+                          </span>
+                        )}
                       </div>
                       {ev.evaluateurNom && (
                         <span className="text-xs text-muted-foreground shrink-0">Par {ev.evaluateurNom}</span>
@@ -818,19 +868,19 @@ export default function SupplierDetailPage() {
 
           <div className="flex items-center gap-1.5 mt-1">
             {(() => {
-              const firstIncomplete = CRITERIA.findIndex((c) => !isCriterionComplete(evalForm, c, priceType))
+              const firstIncomplete = Array.from({ length: TOTAL_STEPS }, (_, i) => i).find((i) => !isStepComplete(i)) ?? -1
               const canVisit = (i: number) => firstIncomplete === -1 || i <= firstIncomplete
-              return CRITERIA.map((crit, i) => {
-                const done = isCriterionComplete(evalForm, crit, priceType)
+              return Array.from({ length: TOTAL_STEPS }, (_, i) => i).map((i) => {
+                const done = isStepComplete(i)
                 const current = i === evalStep
                 const visitable = canVisit(i)
                 return (
                   <button
-                    key={crit.key}
+                    key={i}
                     type="button"
                     onClick={() => visitable && setEvalStep(i)}
                     disabled={!visitable}
-                    title={`${i + 1}. ${crit.label}`}
+                    title={stepLabel(i)}
                     className={`h-2 flex-1 rounded-full transition-colors ${
                       visitable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'
                     } ${done ? 'bg-[#2db34b]' : current ? 'bg-primary' : 'bg-muted'}`}
@@ -840,12 +890,41 @@ export default function SupplierDetailPage() {
             })()}
           </div>
           <p className="text-xs text-muted-foreground mt-1.5">
-            Critère {evalStep + 1} / {CRITERIA.length} — {CRITERIA[evalStep].label}
+            {stepLabel(evalStep)}
           </p>
 
           <div className="mt-3 space-y-4">
-            {(() => {
-              const crit = CRITERIA[evalStep]
+            {evalStep === 0 ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Prestation à évaluer *</Label>
+                  <Select
+                    value={evalContext.prestationId}
+                    onChange={(e) => setEvalContext((c) => ({ ...c, prestationId: e.target.value }))}
+                  >
+                    <option value="">-- Sélectionner --</option>
+                    {prestations.filter((pr) => pr.operateurId === id).map((pr) => (
+                      <option key={pr.id} value={pr.id}>
+                        {pr.reference} — {pr.structureContractante || 'Prestation'}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Semestre *</Label>
+                  <Select
+                    value={evalContext.semestre}
+                    onChange={(e) => setEvalContext((c) => ({ ...c, semestre: e.target.value }))}
+                  >
+                    <option value="">-- Semestre --</option>
+                    {SEMESTRES.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+            ) : (() => {
+              const crit = CRITERIA[evalStep - 1]
               if (crit.key === 'notePrix') {
                 return (
                   <PriceCriterionPicker
@@ -865,7 +944,7 @@ export default function SupplierDetailPage() {
               )
             })()}
 
-            {evalStep === CRITERIA.length - 1 && CRITERIA.every((c) => isCriterionComplete(evalForm, c, priceType)) && (() => {
+            {evalStep === TOTAL_STEPS - 1 && evalContextComplete && CRITERIA.every((c) => isCriterionComplete(evalForm, c, priceType)) && (() => {
               const total = CRITERIA.reduce((s, c) => s + getCriterionValue(evalForm, c, priceType), 0)
               const appr = getAppreciation(total)
               return (
@@ -887,17 +966,17 @@ export default function SupplierDetailPage() {
               ) : (
                 <span />
               )}
-              {evalStep < CRITERIA.length - 1 ? (
+              {evalStep < TOTAL_STEPS - 1 ? (
                 <Button
                   onClick={() => setEvalStep((s) => s + 1)}
-                  disabled={!isCriterionComplete(evalForm, CRITERIA[evalStep], priceType)}
+                  disabled={!isStepComplete(evalStep)}
                 >
                   Suivant
                 </Button>
               ) : (
                 <Button
                   onClick={handleSubmitEvaluation}
-                  disabled={CRITERIA.some((c) => !isCriterionComplete(evalForm, c, priceType)) || submitting}
+                  disabled={!evalContextComplete || CRITERIA.some((c) => !isCriterionComplete(evalForm, c, priceType)) || submitting}
                 >
                   {submitting ? 'Enregistrement...' : 'Enregistrer'}
                 </Button>

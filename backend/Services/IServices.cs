@@ -73,3 +73,12 @@ public interface IEvaluationService
     Task<EvaluationStatsDto> GetStatsAsync(int operateurId);
     Task<EvaluationDto> CreateAsync(CreateEvaluationRequest request, int evaluateurId);
 }
+
+public interface IPrestationService
+{
+    Task<PrestationPagedResult> GetAllPrestationsAsync(int page, int pageSize, string? search);
+    Task<PrestationDto?> GetPrestationByIdAsync(int id);
+    Task<PrestationDto> CreatePrestationAsync(CreatePrestationRequest request, int userId);
+    Task<PrestationDto> UpdatePrestationAsync(int id, UpdatePrestationRequest request);
+    Task<bool> DeletePrestationAsync(int id);
+}

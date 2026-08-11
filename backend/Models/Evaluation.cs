@@ -12,6 +12,10 @@ public class Evaluation
     public int NoteHse { get; set; }
     public int NoteService { get; set; }
     public double NoteGlobale { get; set; }
+    public int? Annee { get; set; }
+    public string? Semestre { get; set; }
+    public int? PrestationId { get; set; }
+    public Prestation? Prestation { get; set; }
     public string? Commentaire { get; set; }
     public int? EvaluateurId { get; set; }
     public Utilisateur? Evaluateur { get; set; }

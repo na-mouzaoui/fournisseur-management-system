@@ -219,6 +219,9 @@ export interface Evaluation {
   noteHse: number
   noteService: number
   noteGlobale: number
+  semestre?: string
+  prestationId?: number
+  prestationReference?: string
   commentaire?: string
   evaluateurId?: number
   evaluateurNom?: string
@@ -229,6 +232,40 @@ export interface EvaluationStats {
   totalEvaluations: number
   noteGlobaleActuelle?: number
   derniereNote?: number
+}
+
+// ===== Prestations =====
+export interface Prestation {
+  id: number
+  reference: string
+  structureContractante: string
+  description?: string
+  operateurId: number
+  operateurRaisonSociale?: string
+  operateurNumeroImmatriculation?: string
+  dateDebut: string
+  dateFin?: string
+  createdBy?: number
+  createdAt: string
+  updatedAt?: string
+}
+
+export interface CreatePrestationRequest {
+  reference: string
+  structureContractante: string
+  description?: string
+  operateurId: number
+  dateDebut: string
+  dateFin?: string
+}
+
+export interface UpdatePrestationRequest {
+  reference: string
+  structureContractante: string
+  description?: string
+  operateurId: number
+  dateDebut: string
+  dateFin?: string
 }
 
 // ===== Pagination =====

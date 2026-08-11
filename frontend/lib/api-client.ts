@@ -22,6 +22,9 @@ import {
   BlacklistEntry,
   Evaluation,
   EvaluationStats,
+  Prestation,
+  CreatePrestationRequest,
+  UpdatePrestationRequest,
 } from './types'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
@@ -438,11 +441,52 @@ class ApiClient {
     notePrixContrat: number
     noteHse: number
     noteService: number
+    semestre?: string
+    prestationId?: number
     commentaire?: string
   }): Promise<Evaluation> {
     return this.fetch<Evaluation>('/api/evaluations', {
       method: 'POST',
       body: JSON.stringify(data),
+    })
+  }
+
+  // ===== Prestations =====
+  async getPrestations(
+    page: number = 1,
+    pageSize: number = 10,
+    search?: string
+  ): Promise<PaginatedResponse<Prestation>> {
+    let url = `/api/prestations?page=${page}&pageSize=${pageSize}`
+    if (search) url += `&search=${encodeURIComponent(search)}`
+    return this.fetch<PaginatedResponse<Prestation>>(url, {
+      method: 'GET',
+    })
+  }
+
+  async getPrestation(id: number): Promise<Prestation> {
+    return this.fetch<Prestation>(`/api/prestations/${id}`, {
+      method: 'GET',
+    })
+  }
+
+  async createPrestation(data: CreatePrestationRequest): Promise<Prestation> {
+    return this.fetch<Prestation>('/api/prestations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updatePrestation(id: number, data: UpdatePrestationRequest): Promise<Prestation> {
+    return this.fetch<Prestation>(`/api/prestations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deletePrestation(id: number): Promise<void> {
+    await this.fetch<void>(`/api/prestations/${id}`, {
+      method: 'DELETE',
     })
   }
 }

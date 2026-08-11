@@ -9,6 +9,8 @@ public class CreateEvaluationRequest
     public int NotePrixContrat { get; set; }
     public int NoteHse { get; set; }
     public int NoteService { get; set; }
+    public string? Semestre { get; set; }
+    public int? PrestationId { get; set; }
     public string? Commentaire { get; set; }
 }
 
@@ -24,6 +26,9 @@ public class EvaluationDto
     public int NoteHse { get; set; }
     public int NoteService { get; set; }
     public double NoteGlobale { get; set; }
+    public string? Semestre { get; set; }
+    public int? PrestationId { get; set; }
+    public string? PrestationReference { get; set; }
     public string? Commentaire { get; set; }
     public int? EvaluateurId { get; set; }
     public string? EvaluateurNom { get; set; }

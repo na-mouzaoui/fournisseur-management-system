@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, LogOut, Package } from 'lucide-react'
+import { LayoutDashboard, LogOut, Package, FileSignature } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth-context'
 import UserProfileMenu from './user-profile-menu'
@@ -10,6 +10,7 @@ import UserProfileMenu from './user-profile-menu'
 const baseNavItems: { name: string; href: string; icon: React.ElementType }[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Fournisseurs', href: '/suppliers', icon: Package },
+  { name: 'Prestations', href: '/prestations', icon: FileSignature },
 ]
 
 export default function Sidebar() {
