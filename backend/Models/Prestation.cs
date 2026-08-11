@@ -8,6 +8,8 @@ public class Prestation
     public string? Description { get; set; }
     public int OperateurId { get; set; }
     public OperateurEconomique Operateur { get; set; } = null!;
+    public int? EtapeId { get; set; }
+    public Etape? Etape { get; set; }
     public DateTime DateDebut { get; set; }
     public DateTime? DateFin { get; set; }
     public int? CreatedBy { get; set; }

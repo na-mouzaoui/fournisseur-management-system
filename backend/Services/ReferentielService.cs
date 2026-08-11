@@ -46,6 +46,17 @@ public class ReferentielService : IReferentielService
         }).ToList();
     }
 
+    public async Task<List<EtapeDto>> GetEtapesAsync()
+    {
+        var etapes = await _context.Etapes.AsNoTracking().OrderBy(e => e.Ordre).ToListAsync();
+        return etapes.Select(e => new EtapeDto
+        {
+            Id = e.Id,
+            Libelle = e.Libelle,
+            Ordre = e.Ordre
+        }).ToList();
+    }
+
     public async Task<SecteurActiviteDto> CreateSecteurAsync(string libelle)
     {
         var secteur = new SecteurActivite { Libelle = libelle };

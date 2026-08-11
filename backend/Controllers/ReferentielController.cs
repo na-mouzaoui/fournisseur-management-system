@@ -35,6 +35,12 @@ public class ReferentielController : ControllerBase
         return Ok(await _referentielService.GetStatutsAsync());
     }
 
+    [HttpGet("etapes")]
+    public async Task<ActionResult<List<EtapeDto>>> GetEtapes()
+    {
+        return Ok(await _referentielService.GetEtapesAsync());
+    }
+
     [HttpPost("secteurs")]
     [Authorize(Roles = "admin")]
     public async Task<ActionResult<SecteurActiviteDto>> CreateSecteur([FromBody] CreateLibelleRequest request)

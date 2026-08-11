@@ -9,6 +9,8 @@ public class PrestationDto
     public int OperateurId { get; set; }
     public string? OperateurRaisonSociale { get; set; }
     public string? OperateurNumeroImmatriculation { get; set; }
+    public int? EtapeId { get; set; }
+    public string? EtapeLibelle { get; set; }
     public DateTime DateDebut { get; set; }
     public DateTime? DateFin { get; set; }
     public int? CreatedBy { get; set; }
@@ -22,6 +24,7 @@ public class CreatePrestationRequest
     public string StructureContractante { get; set; } = string.Empty;
     public string? Description { get; set; }
     public int OperateurId { get; set; }
+    public int? EtapeId { get; set; }
     public DateTime DateDebut { get; set; }
     public DateTime? DateFin { get; set; }
 }
@@ -32,6 +35,7 @@ public class UpdatePrestationRequest
     public string StructureContractante { get; set; } = string.Empty;
     public string? Description { get; set; }
     public int OperateurId { get; set; }
+    public int? EtapeId { get; set; }
     public DateTime DateDebut { get; set; }
     public DateTime? DateFin { get; set; }
 }

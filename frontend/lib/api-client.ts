@@ -25,6 +25,7 @@ import {
   Prestation,
   CreatePrestationRequest,
   UpdatePrestationRequest,
+  Etape,
 } from './types'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
@@ -350,6 +351,12 @@ class ApiClient {
 
   async getStatuts(): Promise<Statut[]> {
     return this.fetch<Statut[]>('/api/referentiels/statuts', {
+      method: 'GET',
+    })
+  }
+
+  async getEtapes(): Promise<Etape[]> {
+    return this.fetch<Etape[]>('/api/referentiels/etapes', {
       method: 'GET',
     })
   }

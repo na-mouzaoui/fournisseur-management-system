@@ -19,6 +19,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<BlacklistEntry> BlacklistEntries { get; set; }
     public DbSet<Evaluation> Evaluations { get; set; }
     public DbSet<Prestation> Prestations { get; set; }
+    public DbSet<Etape> Etapes { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -36,6 +37,7 @@ public class ApplicationDbContext : DbContext
         ConfigureBlacklistEntry(modelBuilder);
         ConfigureEvaluation(modelBuilder);
         ConfigurePrestation(modelBuilder);
+        ConfigureEtape(modelBuilder);
     }
 
     private static void ConfigureRole(ModelBuilder modelBuilder)
@@ -329,6 +331,7 @@ public class ApplicationDbContext : DbContext
             e.Property(c => c.StructureContractante).HasColumnName("structure_contractante").IsRequired().HasMaxLength(200);
             e.Property(c => c.Description).HasColumnName("description").HasMaxLength(1000);
             e.Property(c => c.OperateurId).HasColumnName("operateur_id").IsRequired();
+            e.Property(c => c.EtapeId).HasColumnName("etape_id");
             e.Property(c => c.DateDebut).HasColumnName("date_debut").IsRequired();
             e.Property(c => c.DateFin).HasColumnName("date_fin");
             e.Property(c => c.CreatedBy).HasColumnName("created_by");
@@ -337,16 +340,33 @@ public class ApplicationDbContext : DbContext
 
             e.HasIndex(c => c.Reference);
             e.HasIndex(c => c.OperateurId);
+            e.HasIndex(c => c.EtapeId);
 
             e.HasOne(c => c.Operateur)
                 .WithMany()
                 .HasForeignKey(c => c.OperateurId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            e.HasOne(c => c.Etape)
+                .WithMany()
+                .HasForeignKey(c => c.EtapeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             e.HasOne(c => c.Createur)
                 .WithMany()
                 .HasForeignKey(c => c.CreatedBy)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureEtape(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Etape>(e =>
+        {
+            e.ToTable("etape");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.Libelle).HasColumnName("libelle").IsRequired().HasMaxLength(100);
+            e.Property(x => x.Ordre).HasColumnName("ordre").IsRequired();
         });
     }
 }

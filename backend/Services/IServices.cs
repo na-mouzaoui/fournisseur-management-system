@@ -53,6 +53,7 @@ public interface IReferentielService
     Task<List<RoleDto>> GetRolesAsync();
     Task<List<SecteurActiviteDto>> GetSecteursAsync();
     Task<List<StatutDto>> GetStatutsAsync();
+    Task<List<EtapeDto>> GetEtapesAsync();
     Task<SecteurActiviteDto> CreateSecteurAsync(string libelle);
     Task<StatutDto> CreateStatutAsync(string libelle);
 }

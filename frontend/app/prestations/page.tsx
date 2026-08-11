@@ -23,7 +23,7 @@ import {
   Check,
   ChevronDown,
 } from 'lucide-react'
-import { Prestation, OperateurEconomique } from '@/lib/types'
+import { Prestation, OperateurEconomique, Etape } from '@/lib/types'
 import { apiClient } from '@/lib/api-client'
 
 const PAGE_SIZE = 10
@@ -47,6 +47,7 @@ const EMPTY_FORM = {
   structureContractante: '',
   description: '',
   operateurId: '',
+  etapeId: '',
   dateDebut: '',
   dateFin: '',
 }
@@ -60,6 +61,7 @@ const isArchived = (op: OperateurEconomique) => !!op.isArchived
 export default function PrestationsPage() {
   const [prestations, setPrestations] = useState<Prestation[]>([])
   const [operateurs, setOperateurs] = useState<OperateurEconomique[]>([])
+  const [etapes, setEtapes] = useState<Etape[]>([])
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -75,6 +77,7 @@ export default function PrestationsPage() {
 
   useEffect(() => {
     apiClient.getOperateurs(1, 1000).then((r) => setOperateurs(r.data || [])).catch(() => setOperateurs([]))
+    apiClient.getEtapes().then(setEtapes).catch(() => setEtapes([]))
   }, [])
 
   const loadPrestations = useCallback(async () => {
@@ -109,6 +112,7 @@ export default function PrestationsPage() {
       structureContractante: prestation.structureContractante,
       description: prestation.description || '',
       operateurId: String(prestation.operateurId),
+      etapeId: prestation.etapeId ? String(prestation.etapeId) : '',
       dateDebut: toDateInputValue(prestation.dateDebut),
       dateFin: toDateInputValue(prestation.dateFin),
     })
@@ -116,7 +120,7 @@ export default function PrestationsPage() {
   }
 
   const handleSubmit = async () => {
-    if (!form.reference || !form.structureContractante || !form.operateurId || !form.dateDebut) return
+    if (!form.reference || !form.structureContractante || !form.operateurId || !form.etapeId || !form.dateDebut) return
     try {
       setSaving(true)
       const payload = {
@@ -124,6 +128,7 @@ export default function PrestationsPage() {
         structureContractante: form.structureContractante.trim(),
         description: form.description.trim() || undefined,
         operateurId: Number(form.operateurId),
+        etapeId: form.etapeId ? Number(form.etapeId) : null,
         dateDebut: form.dateDebut,
         dateFin: form.dateFin || undefined,
       }
@@ -201,6 +206,7 @@ export default function PrestationsPage() {
               <tr className="border-b bg-gray-50">
                 <th className="text-left py-3 px-4">Référence</th>
                 <th className="text-left py-3 px-4">Structure contractante</th>
+                <th className="text-left py-3 px-4">Étape en cours</th>
                 <th className="text-left py-3 px-4">Fournisseur</th>
                 <th className="text-left py-3 px-4">Date de début</th>
                 <th className="text-left py-3 px-4">Date de fin</th>
@@ -216,6 +222,13 @@ export default function PrestationsPage() {
                     </span>
                   </td>
                   <td className="py-3 px-4">{prestation.structureContractante || '—'}</td>
+                  <td className="py-3 px-4">
+                    {prestation.etapeLibelle ? (
+                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                        {prestation.etapeLibelle}
+                      </span>
+                    ) : '—'}
+                  </td>
                   <td className="py-3 px-4">{prestation.operateurRaisonSociale || '—'}</td>
                   <td className="py-3 px-4">
                     <span className="inline-flex items-center gap-1.5 text-muted-foreground">
@@ -319,6 +332,21 @@ export default function PrestationsPage() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="prestation-etape">Étape en cours *</Label>
+              <select
+                id="prestation-etape"
+                value={form.etapeId}
+                onChange={(e) => setForm((f) => ({ ...f, etapeId: e.target.value }))}
+                className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#2db34b] focus:ring-2 focus:ring-[#2db34b]"
+              >
+                <option value="">-- Sélectionner l'étape --</option>
+                {etapes.map((et) => (
+                  <option key={et.id} value={et.id}>{et.libelle}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="prestation-description">Description</Label>
               <textarea
                 id="prestation-description"
@@ -357,7 +385,7 @@ export default function PrestationsPage() {
               </Button>
               <Button
                 onClick={handleSubmit}
-                disabled={!form.reference || !form.structureContractante || !form.operateurId || !form.dateDebut || saving}
+                disabled={!form.reference || !form.structureContractante || !form.operateurId || !form.etapeId || !form.dateDebut || saving}
               >
                 {saving ? 'Enregistrement...' : editingId ? 'Enregistrer' : 'Créer'}
               </Button>

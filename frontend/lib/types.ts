@@ -198,6 +198,12 @@ export interface Statut {
   libelle: string
 }
 
+export interface Etape {
+  id: number
+  libelle: string
+  ordre: number
+}
+
 export interface BlacklistEntry {
   id: number
   operateurId: number
@@ -243,6 +249,8 @@ export interface Prestation {
   operateurId: number
   operateurRaisonSociale?: string
   operateurNumeroImmatriculation?: string
+  etapeId?: number
+  etapeLibelle?: string
   dateDebut: string
   dateFin?: string
   createdBy?: number
@@ -255,6 +263,7 @@ export interface CreatePrestationRequest {
   structureContractante: string
   description?: string
   operateurId: number
+  etapeId?: number | null
   dateDebut: string
   dateFin?: string
 }
@@ -264,6 +273,7 @@ export interface UpdatePrestationRequest {
   structureContractante: string
   description?: string
   operateurId: number
+  etapeId?: number | null
   dateDebut: string
   dateFin?: string
 }

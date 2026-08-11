@@ -33,6 +33,7 @@ public class PrestationService : IPrestationService
 
         var items = await query
             .Include(c => c.Operateur)
+            .Include(c => c.Etape)
             .OrderByDescending(c => c.DateDebut)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -51,6 +52,7 @@ public class PrestationService : IPrestationService
     {
         var prestation = await _context.Prestations
             .Include(c => c.Operateur)
+            .Include(c => c.Etape)
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == id);
 
@@ -65,12 +67,16 @@ public class PrestationService : IPrestationService
 
         ValidateDates(request.DateDebut, request.DateFin);
 
+        if (request.EtapeId.HasValue && !await _context.Etapes.AnyAsync(e => e.Id == request.EtapeId.Value))
+            throw new InvalidOperationException("Étape invalide");
+
         var prestation = new Prestation
         {
             Reference = request.Reference,
             StructureContractante = request.StructureContractante,
             Description = request.Description,
             OperateurId = request.OperateurId,
+            EtapeId = request.EtapeId,
             DateDebut = request.DateDebut,
             DateFin = request.DateFin,
             CreatedBy = userId,
@@ -95,10 +101,14 @@ public class PrestationService : IPrestationService
 
         ValidateDates(request.DateDebut, request.DateFin);
 
+        if (request.EtapeId.HasValue && !await _context.Etapes.AnyAsync(e => e.Id == request.EtapeId.Value))
+            throw new InvalidOperationException("Étape invalide");
+
         prestation.Reference = request.Reference;
         prestation.StructureContractante = request.StructureContractante;
         prestation.Description = request.Description;
         prestation.OperateurId = request.OperateurId;
+        prestation.EtapeId = request.EtapeId;
         prestation.DateDebut = request.DateDebut;
         prestation.DateFin = request.DateFin;
         prestation.UpdatedAt = DateTime.UtcNow;
@@ -136,6 +146,8 @@ public class PrestationService : IPrestationService
             OperateurId = prestation.OperateurId,
             OperateurRaisonSociale = prestation.Operateur?.RaisonSociale,
             OperateurNumeroImmatriculation = prestation.Operateur?.NumeroImmatriculation,
+            EtapeId = prestation.EtapeId,
+            EtapeLibelle = prestation.Etape?.Libelle,
             DateDebut = prestation.DateDebut,
             DateFin = prestation.DateFin,
             CreatedBy = prestation.CreatedBy,

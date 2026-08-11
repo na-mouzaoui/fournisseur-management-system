@@ -30,3 +30,10 @@ public class StatutDto
     public int Id { get; set; }
     public string Libelle { get; set; } = string.Empty;
 }
+
+public class EtapeDto
+{
+    public int Id { get; set; }
+    public string Libelle { get; set; } = string.Empty;
+    public int Ordre { get; set; }
+}
