@@ -16,6 +16,7 @@ import {
   Star,
   Calendar,
   Edit2,
+  ChevronDown,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { OperateurEconomique, Evaluation, EvaluationStats, SecteurActivite } from '@/lib/types'
@@ -43,11 +44,11 @@ function StatutBadge({ statut }: { statut?: string }) {
 }
 
 const APPRECIATION_SCALE = [
-  { min: 24, label: 'Excellent', badge: 'bg-[#2db34b] text-white' },
-  { min: 16, label: 'Bon', badge: 'bg-[#2db34b]/15 text-[#2db34b]' },
-  { min: 12, label: 'Satisfaisant', badge: 'bg-yellow-100 text-yellow-800' },
-  { min: 8, label: 'Insatisfaisant', badge: 'bg-orange-100 text-orange-800' },
-  { min: 0, label: 'Mauvais', badge: 'bg-red-100 text-red-800' },
+  { min: 20, range: '20', label: 'Excellent', badge: 'bg-[#2db34b] text-white' },
+  { min: 16, range: '19-16', label: 'Bon', badge: 'bg-[#2db34b]/15 text-[#2db34b]' },
+  { min: 12, range: '15-12', label: 'Satisfaisant', badge: 'bg-yellow-100 text-yellow-800' },
+  { min: 8, range: '11-8', label: 'Insatisfaisant', badge: 'bg-orange-100 text-orange-800' },
+  { min: 0, range: '7-0', label: 'Mauvais', badge: 'bg-red-100 text-red-800' },
 ] as const
 
 function getAppreciation(note?: number | null) {
@@ -60,7 +61,7 @@ function ScoreBadge({ note }: { note?: number | null }) {
   if (note === undefined || note === null || !appreciation) return <span className="text-muted-foreground text-sm">—</span>
   return (
     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${appreciation.badge}`}>
-      <Star size={12} fill="currentColor" /> {note.toFixed(1)}/24 · {appreciation.label}
+      <Star size={12} fill="currentColor" /> {note.toFixed(1)}/20 · {appreciation.label}
     </span>
   )
 }
@@ -88,12 +89,47 @@ type EvaluationForm = {
   noteService: number
 }
 
-const CRITERIA: {
-  key: keyof EvaluationForm
+type PriceMode = 'consultation' | 'contrat'
+
+const PRICE_MODES: Record<PriceMode, {
+  key: 'notePrixConsultation' | 'notePrixContrat'
   label: string
-  max: number
   options: { value: number; label: string }[]
-}[] = [
+}> = {
+  consultation: {
+    key: 'notePrixConsultation',
+    label: 'Consultation',
+    options: [
+      { value: 0, label: 'Prix excessif' },
+      { value: 2, label: 'Prix moyen' },
+      { value: 4, label: 'Prix moins disant' },
+    ],
+  },
+  contrat: {
+    key: 'notePrixContrat',
+    label: 'Contrat à commande',
+    options: [
+      { value: 0, label: 'Prix révisé à la hausse' },
+      { value: 3, label: 'Prix maintenu' },
+      { value: 4, label: 'Effort commercial / Remise' },
+    ],
+  },
+}
+
+type Criterion =
+  | {
+      key: 'notePrix'
+      label: string
+      max: number
+    }
+  | {
+      key: keyof EvaluationForm
+      label: string
+      max: number
+      options: { value: number; label: string }[]
+    }
+
+const CRITERIA: Criterion[] = [
   {
     key: 'noteConformite',
     label: 'Conformité du Produit/Service Acheté',
@@ -117,24 +153,9 @@ const CRITERIA: {
     ],
   },
   {
-    key: 'notePrixConsultation',
-    label: 'Prix (Consultation)',
+    key: 'notePrix',
+    label: 'Prix',
     max: 4,
-    options: [
-      { value: 0, label: 'Prix excessif' },
-      { value: 2, label: 'Prix moyen' },
-      { value: 4, label: 'Prix moins disant' },
-    ],
-  },
-  {
-    key: 'notePrixContrat',
-    label: 'Prix (Contrat à commande)',
-    max: 4,
-    options: [
-      { value: 0, label: 'Prix révisé à la hausse' },
-      { value: 3, label: 'Prix maintenu' },
-      { value: 4, label: 'Effort commercial / Remise' },
-    ],
   },
   {
     key: 'noteHse',
@@ -158,6 +179,14 @@ const CRITERIA: {
   },
 ]
 
+function getCriterionValue(form: EvaluationForm, crit: Criterion, priceType: PriceMode): number {
+  return crit.key === 'notePrix' ? form[PRICE_MODES[priceType].key] : form[crit.key]
+}
+
+function isCriterionComplete(form: EvaluationForm, crit: Criterion, priceType: PriceMode): boolean {
+  return getCriterionValue(form, crit, priceType) >= 0
+}
+
 const EMPTY_EVAL_FORM: EvaluationForm = {
   noteConformite: -1,
   noteDelai: -1,
@@ -172,7 +201,7 @@ function CriterionPicker({
   value,
   onChange,
 }: {
-  criterion: (typeof CRITERIA)[number]
+  criterion: Extract<Criterion, { options: { value: number; label: string }[] }>
   value: number
   onChange: (v: number) => void
 }) {
@@ -220,6 +249,48 @@ function CriterionPicker({
   )
 }
 
+function PriceCriterionPicker({
+  mode,
+  value,
+  onModeChange,
+  onChange,
+}: {
+  mode: PriceMode
+  value: number
+  onModeChange: (m: PriceMode) => void
+  onChange: (v: number) => void
+}) {
+  const active = PRICE_MODES[mode]
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-sm font-semibold leading-snug">Prix</Label>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={mode === 'contrat'}
+          aria-label="Choisir le type de prix"
+          onClick={() => onModeChange(mode === 'consultation' ? 'contrat' : 'consultation')}
+          className={`relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors ${
+            mode === 'contrat' ? 'bg-primary' : 'bg-muted-foreground/30'
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+              mode === 'contrat' ? 'translate-x-4' : ''
+            }`}
+          />
+        </button>
+      </div>
+      <CriterionPicker
+        criterion={{ key: active.key, label: active.label, max: 4, options: active.options }}
+        value={value}
+        onChange={onChange}
+      />
+    </div>
+  )
+}
+
 export default function SupplierDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -235,11 +306,22 @@ export default function SupplierDetailPage() {
 
   const [showEvalModal, setShowEvalModal] = useState(false)
   const [evalForm, setEvalForm] = useState<EvaluationForm>(EMPTY_EVAL_FORM)
+  const [priceType, setPriceType] = useState<PriceMode>('consultation')
   const [evalStep, setEvalStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [editingTab, setEditingTab] = useState<string | null>(null)
   const [editInfoForm, setEditInfoForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [expandedEvals, setExpandedEvals] = useState<Set<number>>(new Set())
+
+  const toggleEval = (id: number) => {
+    setExpandedEvals((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   useEffect(() => {
     if (!id) return
@@ -301,16 +383,18 @@ export default function SupplierDetailPage() {
   }
 
   const handleSubmitEvaluation = async () => {
-    const incomplete = CRITERIA.some((c) => evalForm[c.key] < 0)
+    const incomplete = CRITERIA.some((c) => !isCriterionComplete(evalForm, c, priceType))
     if (incomplete) return
     try {
+      const prixKey = PRICE_MODES[priceType].key
+      const otherPrixKey = prixKey === 'notePrixConsultation' ? 'notePrixContrat' : 'notePrixConsultation'
       setSubmitting(true)
       await apiClient.createEvaluation({
         operateurId: id,
         noteConformite: evalForm.noteConformite,
         noteDelai: evalForm.noteDelai,
-        notePrixConsultation: evalForm.notePrixConsultation,
-        notePrixContrat: evalForm.notePrixContrat,
+        notePrixConsultation: prixKey === 'notePrixConsultation' ? evalForm.notePrixConsultation : 0,
+        notePrixContrat: prixKey === 'notePrixContrat' ? evalForm.notePrixContrat : 0,
         noteHse: evalForm.noteHse,
         noteService: evalForm.noteService,
       })
@@ -323,6 +407,7 @@ export default function SupplierDetailPage() {
       setShowEvalModal(false)
       setEvalStep(0)
       setEvalForm(EMPTY_EVAL_FORM)
+      setPriceType('consultation')
     } catch (err) {
       setError("Erreur lors de l'enregistrement")
     } finally {
@@ -607,7 +692,7 @@ export default function SupplierDetailPage() {
               <div className="p-3 rounded-lg bg-gray-50">
                 <p className="text-2xl font-bold">
                   {stats?.noteGlobaleActuelle != null ? stats.noteGlobaleActuelle.toFixed(1) : '—'}
-                  {stats?.noteGlobaleActuelle != null ? '/24' : ''}
+                  {stats?.noteGlobaleActuelle != null ? '/20' : ''}
                 </p>
                 <p className="text-xs text-muted-foreground">Note moyenne</p>
                 {stats?.noteGlobaleActuelle != null && (
@@ -621,7 +706,7 @@ export default function SupplierDetailPage() {
               <div className="p-3 rounded-lg bg-gray-50">
                 <p className="text-2xl font-bold">
                   {stats?.derniereNote != null ? stats.derniereNote.toFixed(1) : '—'}
-                  {stats?.derniereNote != null ? '/24' : ''}
+                  {stats?.derniereNote != null ? '/20' : ''}
                 </p>
                 <p className="text-xs text-muted-foreground">Dernière note</p>
                 {stats?.derniereNote != null && (
@@ -633,26 +718,9 @@ export default function SupplierDetailPage() {
                 )}
               </div>
             </div>
-            <Button onClick={() => { setEvalStep(0); setShowEvalModal(true) }}>
+            <Button onClick={() => { setEvalStep(0); setPriceType('consultation'); setShowEvalModal(true) }}>
               <Star size={16} className="mr-1.5" /> Nouvelle évaluation
             </Button>
-          </div>
-
-          <div className="rounded-lg border p-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-              Échelle d'appréciation
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              {APPRECIATION_SCALE.map((s, i) => (
-                <span
-                  key={s.label}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${s.badge}`}
-                >
-                  {s.label}
-                  {i === 0 ? ' : 24' : i === APPRECIATION_SCALE.length - 1 ? ' : < 8' : ` : ${s.min} - ${APPRECIATION_SCALE[i - 1].min - 1}`}
-                </span>
-              ))}
-            </div>
           </div>
 
           {evaluations.length === 0 ? (
@@ -661,31 +729,52 @@ export default function SupplierDetailPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {evaluations.map((ev) => (
-                <div key={ev.id} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <ScoreBadge note={ev.noteGlobale} />
-                      <span className="text-sm text-muted-foreground flex items-center gap-1">
-                        <Calendar size={14} /> {formatDateTime(ev.dateEvaluation)}
-                      </span>
-                    </div>
-                    {ev.evaluateurNom && (
-                      <span className="text-xs text-muted-foreground">Par {ev.evaluateurNom}</span>
+              {evaluations.map((ev) => {
+                const open = expandedEvals.has(ev.id)
+                return (
+                  <div key={ev.id} className="border rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => toggleEval(ev.id)}
+                      aria-expanded={open}
+                      className="w-full flex items-center justify-between gap-3 p-4 text-left cursor-pointer hover:bg-muted/50 transition-colors rounded-lg"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <ChevronDown
+                          size={18}
+                          className={`shrink-0 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`}
+                        />
+                        <ScoreBadge note={ev.noteGlobale} />
+                        <span className="text-sm text-muted-foreground flex items-center gap-1">
+                          <Calendar size={14} /> {formatDateTime(ev.dateEvaluation)}
+                        </span>
+                      </div>
+                      {ev.evaluateurNom && (
+                        <span className="text-xs text-muted-foreground shrink-0">Par {ev.evaluateurNom}</span>
+                      )}
+                    </button>
+                    {open && (
+                      <div className="px-4 pb-4">
+                        <div className="grid grid-cols-5 gap-3 text-center text-xs">
+                          {CRITERIA.map((crit) => {
+                            const value = crit.key === 'notePrix'
+                              ? Math.max(ev.notePrixConsultation, ev.notePrixContrat)
+                              : ev[crit.key]
+                            return (
+                              <div key={crit.key} className="p-2 rounded bg-gray-50">
+                                <p className="font-semibold text-sm">
+                                  {value}/{crit.max}
+                                </p>
+                                <p className="text-muted-foreground">{crit.label}</p>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
                     )}
                   </div>
-                  <div className="grid grid-cols-3 gap-3 text-center text-xs">
-                    {CRITERIA.map((crit) => (
-                      <div key={crit.key} className="p-2 rounded bg-gray-50">
-                        <p className="font-semibold text-sm">
-                          {ev[crit.key]}/{crit.max}
-                        </p>
-                        <p className="text-muted-foreground">{crit.label}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -722,48 +811,69 @@ export default function SupplierDetailPage() {
           <DialogHeader>
             <DialogTitle>Nouvelle évaluation</DialogTitle>
             <DialogDescription>
-              Évaluez {operateur.raisonSociale} sur les 6 critères ({' '}
+              Évaluez {operateur.raisonSociale} sur les 5 critères ({' '}
               {CRITERIA.reduce((s, c) => s + c.max, 0)} points au total).
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex items-center gap-1.5 mt-1">
-            {CRITERIA.map((crit, i) => {
-              const done = evalForm[crit.key] >= 0
-              const current = i === evalStep
-              return (
-                <button
-                  key={crit.key}
-                  type="button"
-                  onClick={() => setEvalStep(i)}
-                  title={`${i + 1}. ${crit.label}`}
-                  className={`h-2 flex-1 rounded-full transition-colors cursor-pointer ${
-                    done ? 'bg-[#2db34b]' : current ? 'bg-primary' : 'bg-muted'
-                  }`}
-                />
-              )
-            })}
+            {(() => {
+              const firstIncomplete = CRITERIA.findIndex((c) => !isCriterionComplete(evalForm, c, priceType))
+              const canVisit = (i: number) => firstIncomplete === -1 || i <= firstIncomplete
+              return CRITERIA.map((crit, i) => {
+                const done = isCriterionComplete(evalForm, crit, priceType)
+                const current = i === evalStep
+                const visitable = canVisit(i)
+                return (
+                  <button
+                    key={crit.key}
+                    type="button"
+                    onClick={() => visitable && setEvalStep(i)}
+                    disabled={!visitable}
+                    title={`${i + 1}. ${crit.label}`}
+                    className={`h-2 flex-1 rounded-full transition-colors ${
+                      visitable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'
+                    } ${done ? 'bg-[#2db34b]' : current ? 'bg-primary' : 'bg-muted'}`}
+                  />
+                )
+              })
+            })()}
           </div>
           <p className="text-xs text-muted-foreground mt-1.5">
             Critère {evalStep + 1} / {CRITERIA.length} — {CRITERIA[evalStep].label}
           </p>
 
           <div className="mt-3 space-y-4">
-            <CriterionPicker
-              criterion={CRITERIA[evalStep]}
-              value={evalForm[CRITERIA[evalStep].key]}
-              onChange={(v) => setEvalForm((f) => ({ ...f, [CRITERIA[evalStep].key]: v }))}
-            />
+            {(() => {
+              const crit = CRITERIA[evalStep]
+              if (crit.key === 'notePrix') {
+                return (
+                  <PriceCriterionPicker
+                    mode={priceType}
+                    value={evalForm[PRICE_MODES[priceType].key]}
+                    onModeChange={setPriceType}
+                    onChange={(v) => setEvalForm((f) => ({ ...f, [PRICE_MODES[priceType].key]: v }))}
+                  />
+                )
+              }
+              return (
+                <CriterionPicker
+                  criterion={crit}
+                  value={evalForm[crit.key]}
+                  onChange={(v) => setEvalForm((f) => ({ ...f, [crit.key]: v }))}
+                />
+              )
+            })()}
 
-            {evalStep === CRITERIA.length - 1 && (() => {
-              const total = CRITERIA.reduce((s, c) => s + (evalForm[c.key] >= 0 ? evalForm[c.key] : 0), 0)
+            {evalStep === CRITERIA.length - 1 && CRITERIA.every((c) => isCriterionComplete(evalForm, c, priceType)) && (() => {
+              const total = CRITERIA.reduce((s, c) => s + getCriterionValue(evalForm, c, priceType), 0)
               const appr = getAppreciation(total)
               return (
                 <div className="rounded-lg bg-gray-50 p-3 flex items-center justify-between">
                   <span className="text-sm font-medium">Total</span>
                   <span className="flex items-center gap-2">
                     {appr && <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${appr.badge}`}>{appr.label}</span>}
-                    <span className="text-lg font-bold">{total} / 24</span>
+                    <span className="text-lg font-bold">{total} / 20</span>
                   </span>
                 </div>
               )
@@ -780,14 +890,14 @@ export default function SupplierDetailPage() {
               {evalStep < CRITERIA.length - 1 ? (
                 <Button
                   onClick={() => setEvalStep((s) => s + 1)}
-                  disabled={evalForm[CRITERIA[evalStep].key] < 0}
+                  disabled={!isCriterionComplete(evalForm, CRITERIA[evalStep], priceType)}
                 >
                   Suivant
                 </Button>
               ) : (
                 <Button
                   onClick={handleSubmitEvaluation}
-                  disabled={CRITERIA.some((c) => evalForm[c.key] < 0) || submitting}
+                  disabled={CRITERIA.some((c) => !isCriterionComplete(evalForm, c, priceType)) || submitting}
                 >
                   {submitting ? 'Enregistrement...' : 'Enregistrer'}
                 </Button>
