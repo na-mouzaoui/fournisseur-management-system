@@ -26,6 +26,9 @@ import {
   CreatePrestationRequest,
   UpdatePrestationRequest,
   Etape,
+  Historique,
+  CreateHistoriqueRequest,
+  UpdateHistoriqueRequest,
 } from './types'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
@@ -493,6 +496,41 @@ class ApiClient {
 
   async deletePrestation(id: number): Promise<void> {
     await this.fetch<void>(`/api/prestations/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
+  // ===== Historique =====
+  async getHistoriques(
+    page: number = 1,
+    pageSize: number = 10,
+    operateurId?: number,
+    search?: string
+  ): Promise<PaginatedResponse<Historique>> {
+    let url = `/api/historiques?page=${page}&pageSize=${pageSize}`
+    if (operateurId) url += `&operateurId=${operateurId}`
+    if (search) url += `&search=${encodeURIComponent(search)}`
+    return this.fetch<PaginatedResponse<Historique>>(url, {
+      method: 'GET',
+    })
+  }
+
+  async createHistorique(data: CreateHistoriqueRequest): Promise<Historique> {
+    return this.fetch<Historique>('/api/historiques', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateHistorique(id: number, data: UpdateHistoriqueRequest): Promise<Historique> {
+    return this.fetch<Historique>(`/api/historiques/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteHistorique(id: number): Promise<void> {
+    await this.fetch<void>(`/api/historiques/${id}`, {
       method: 'DELETE',
     })
   }

@@ -83,3 +83,12 @@ public interface IPrestationService
     Task<PrestationDto> UpdatePrestationAsync(int id, UpdatePrestationRequest request);
     Task<bool> DeletePrestationAsync(int id);
 }
+
+public interface IHistoriqueService
+{
+    Task<HistoriquePagedResult> GetAllHistoriquesAsync(int page, int pageSize, int? operateurId, string? search);
+    Task<HistoriqueDto?> GetHistoriqueByIdAsync(int id);
+    Task<HistoriqueDto> CreateHistoriqueAsync(CreateHistoriqueRequest request, int userId);
+    Task<HistoriqueDto> UpdateHistoriqueAsync(int id, UpdateHistoriqueRequest request);
+    Task<bool> DeleteHistoriqueAsync(int id);
+}

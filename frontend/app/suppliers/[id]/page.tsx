@@ -26,6 +26,7 @@ import CommercialSection from './commercial'
 import TechniqueSection from './technique'
 import FinanciersSection from './financiers'
 import RelationSection from './relation'
+import HistoriqueSection from './historique'
 
 function StatutBadge({ statut }: { statut?: string }) {
   const classes =
@@ -851,9 +852,7 @@ export default function SupplierDetailPage() {
       )}
 
       {activeTab === 'historique' && (
-        <div className="text-center py-12 text-muted-foreground">
-          <p className="text-sm">Section en cours de développement</p>
-        </div>
+        <HistoriqueSection operateurId={id} />
       )}
 
       <Dialog open={showEvalModal} onOpenChange={setShowEvalModal}>

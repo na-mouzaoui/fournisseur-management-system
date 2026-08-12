@@ -20,6 +20,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Evaluation> Evaluations { get; set; }
     public DbSet<Prestation> Prestations { get; set; }
     public DbSet<Etape> Etapes { get; set; }
+    public DbSet<Historique> Historiques { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -38,6 +39,7 @@ public class ApplicationDbContext : DbContext
         ConfigureEvaluation(modelBuilder);
         ConfigurePrestation(modelBuilder);
         ConfigureEtape(modelBuilder);
+        ConfigureHistorique(modelBuilder);
     }
 
     private static void ConfigureRole(ModelBuilder modelBuilder)
@@ -367,6 +369,40 @@ public class ApplicationDbContext : DbContext
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.Libelle).HasColumnName("libelle").IsRequired().HasMaxLength(100);
             e.Property(x => x.Ordre).HasColumnName("ordre").IsRequired();
+        });
+    }
+
+    private static void ConfigureHistorique(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Historique>(e =>
+        {
+            e.ToTable("historique");
+            e.Property(h => h.Id).HasColumnName("id");
+            e.Property(h => h.Action).HasColumnName("action").IsRequired().HasMaxLength(255);
+            e.Property(h => h.OperateurId).HasColumnName("operateur_id").IsRequired();
+            e.Property(h => h.PrestationId).HasColumnName("prestation_id").IsRequired();
+            e.Property(h => h.Annee).HasColumnName("annee").IsRequired();
+            e.Property(h => h.CreatedBy).HasColumnName("created_by");
+            e.Property(h => h.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETDATE()");
+
+            e.HasIndex(h => h.OperateurId);
+            e.HasIndex(h => h.PrestationId);
+            e.HasIndex(h => h.Annee);
+
+            e.HasOne(h => h.Operateur)
+                .WithMany()
+                .HasForeignKey(h => h.OperateurId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(h => h.Prestation)
+                .WithMany()
+                .HasForeignKey(h => h.PrestationId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(h => h.Createur)
+                .WithMany()
+                .HasForeignKey(h => h.CreatedBy)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

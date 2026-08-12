@@ -65,6 +65,7 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IEvaluationService, EvaluationService>();
 builder.Services.AddScoped<IPrestationService, PrestationService>();
+builder.Services.AddScoped<IHistoriqueService, HistoriqueService>();
 
 var app = builder.Build();
 

@@ -278,6 +278,36 @@ export interface UpdatePrestationRequest {
   dateFin?: string
 }
 
+// ===== Historique =====
+export interface Historique {
+  id: number
+  action: string
+  operateurId: number
+  operateurRaisonSociale?: string
+  operateurNumeroImmatriculation?: string
+  prestationId: number
+  prestationReference?: string
+  prestationStructureContractante?: string
+  annee: number
+  createdBy?: number
+  createurNom?: string
+  createdAt: string
+}
+
+export interface CreateHistoriqueRequest {
+  action: string
+  operateurId: number
+  prestationId: number
+  annee: number
+}
+
+export interface UpdateHistoriqueRequest {
+  action: string
+  operateurId: number
+  prestationId: number
+  annee: number
+}
+
 // ===== Pagination =====
 export interface PaginatedResponse<T> {
   data: T[]
