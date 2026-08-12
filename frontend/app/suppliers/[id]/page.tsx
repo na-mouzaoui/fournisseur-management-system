@@ -17,8 +17,10 @@ import {
   Calendar,
   Edit2,
   ChevronDown,
+  Download,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
+import { generateEvaluationDocx } from '@/lib/evaluation-docx'
 import { OperateurEconomique, Evaluation, EvaluationStats, SecteurActivite, Prestation } from '@/lib/types'
 import { OperateurDocuments } from '../page'
 import { Select } from '@/components/ui/select'
@@ -336,6 +338,7 @@ export default function SupplierDetailPage() {
   const [editInfoForm, setEditInfoForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [expandedEvals, setExpandedEvals] = useState<Set<number>>(new Set())
+  const [downloadingId, setDownloadingId] = useState<number | null>(null)
 
   const toggleEval = (id: number) => {
     setExpandedEvals((prev) => {
@@ -453,6 +456,27 @@ export default function SupplierDetailPage() {
       setError("Erreur lors de l'enregistrement")
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleDownloadEvaluationDocx = async (ev: Evaluation) => {
+    if (!operateur || downloadingId !== null) return
+    try {
+      setDownloadingId(ev.id)
+      const prestation = prestations.find((p) => p.id === ev.prestationId)
+      const blob = await generateEvaluationDocx({ operateur, evaluation: ev, prestation })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Fiche_evaluation_${operateur.raisonSociale.replace(/[^a-zA-Z0-9_-]/g, '_')}_${ev.id}.docx`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError("Erreur lors de la génération du fichier Word")
+    } finally {
+      setDownloadingId(null)
     }
   }
 
@@ -805,7 +829,7 @@ export default function SupplierDetailPage() {
                       )}
                     </button>
                     {open && (
-                      <div className="px-4 pb-4">
+                      <div className="px-4 pb-4 space-y-3">
                         <div className="grid grid-cols-5 gap-3 text-center text-xs">
                           {CRITERIA.map((crit) => {
                             const value = crit.key === 'notePrix'
@@ -820,6 +844,17 @@ export default function SupplierDetailPage() {
                               </div>
                             )
                           })}
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownloadEvaluationDocx(ev)}
+                            disabled={downloadingId !== null}
+                          >
+                            <Download size={16} className="mr-1.5" />
+                            {downloadingId === ev.id ? 'Génération...' : 'Télécharger la fiche (Word)'}
+                          </Button>
                         </div>
                       </div>
                     )}
