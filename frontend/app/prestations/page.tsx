@@ -287,7 +287,7 @@ export default function PrestationsPage() {
       )}
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {editingId ? 'Modifier la prestation' : 'Nouvelle prestation'}
@@ -332,18 +332,12 @@ export default function PrestationsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="prestation-etape">Étape en cours *</Label>
-              <select
-                id="prestation-etape"
+              <Label>Étape en cours *</Label>
+              <EtapeStepper
                 value={form.etapeId}
-                onChange={(e) => setForm((f) => ({ ...f, etapeId: e.target.value }))}
-                className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#2db34b] focus:ring-2 focus:ring-[#2db34b]"
-              >
-                <option value="">-- Sélectionner l'étape --</option>
-                {etapes.map((et) => (
-                  <option key={et.id} value={et.id}>{et.libelle}</option>
-                ))}
-              </select>
+                onChange={(v) => setForm((f) => ({ ...f, etapeId: v }))}
+                etapes={etapes}
+              />
             </div>
 
             <div className="space-y-2">
@@ -462,6 +456,65 @@ function OperateurSelect({
           })}
         </div>
       )}
+    </div>
+  )
+}
+
+function EtapeStepper({
+  value,
+  onChange,
+  etapes,
+}: {
+  value: string
+  onChange: (value: string) => void
+  etapes: Etape[]
+}) {
+  const selectedIndex = etapes.findIndex((e) => String(e.id) === value)
+  return (
+    <div className="flex w-full">
+      {etapes.map((et, i) => {
+        const done = selectedIndex !== -1 && i < selectedIndex
+        const current = i === selectedIndex
+        return (
+          <div key={et.id} className="relative flex flex-1 flex-col items-center">
+            {i < etapes.length - 1 && (
+              <span
+                className="absolute top-4 h-0.5"
+                style={{
+                  left: '50%',
+                  right: '-50%',
+                  backgroundColor: done ? '#2db34b' : '#e5e7eb',
+                }}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => onChange(String(et.id))}
+              title={`Marquer comme étape en cours : ${et.libelle}`}
+              className="relative z-10 flex flex-col items-center gap-1.5"
+            >
+              <span
+                className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors ${
+                  done
+                    ? 'border-[#2db34b] bg-[#2db34b] text-white'
+                    : current
+                      ? 'border-primary bg-primary text-white'
+                      : 'border-gray-300 bg-white text-gray-500 hover:border-gray-400'
+                }`}
+              >
+                {done ? <Check size={14} /> : i + 1}
+              </span>
+              <span
+                className={`max-w-24 text-center text-xs leading-tight ${
+                  current ? 'font-semibold text-foreground' : done ? 'text-foreground' : 'text-muted-foreground'
+                }`}
+              >
+                {et.libelle}
+              </span>
+            </button>
+          </div>
+        )
+      })}
     </div>
   )
 }
